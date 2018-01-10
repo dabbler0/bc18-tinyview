@@ -1,0 +1,139 @@
+<html>
+<body>
+<div><input id="fname" placeholder="filename"/> <button id="restart">Restart</button></div>
+<div id="loading"></div>
+<div><input id="timeout" placeholder="timeout" value="10"/></div>
+<table>
+<tr><td>Turn</td><td>Red</td><td>Blue</td</tr>
+<tr><td><span id="turn"></span></td><td><span id="red"></span></td><td><span id="blue"></span></td></tr>
+</table>
+<canvas id="main" width=500 height=500 style="border: 1px solid #000"></canvas>
+<script>
+var canvas = document.getElementById('main');
+var ctx = canvas.getContext('2d');
+
+var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
+
+var timeout = 10;
+
+document.getElementById('timeout').addEventListener('keydown', function(e) {
+    if (e.which == 13) {
+	timeout = Number(document.getElementById('timeout').value);
+    }
+});
+
+function visualize(path) {
+    var q = new XMLHttpRequest();
+    q.open('GET', path, true);
+
+    var current_anim_timeout = null;
+
+    document.getElementById('loading').innerText = 'Loading...';
+
+    var renderings = [];
+    var TEAMS = ['Red', 'Blue'];
+
+    var id2team = {};
+
+    var earth_map, mars_map;
+
+    var reserves = [100, 100];
+
+    q.onreadystatechange = function() {
+	if (q.readyState == XMLHttpRequest.DONE) {
+	    document.getElementById('loading').innerText = 'Done.';
+
+	    var data = JSON.parse(q.responseText);
+	    data = data['message'].map(JSON.parse);
+
+	    earth_map = data[0].world.planet_maps.Earth.is_passable_terrain;
+	    karbonite_map = data[0].world.planet_maps.Earth.initial_karbonite;
+
+	    var original_karbonite_map = karbonite_map.map(function(x) { return x.slice(0); });
+
+	    var w = earth_map[0].length, h = earth_map.length;
+
+	    var initial_units = data[0].world.planet_states.Earth.units
+	    for (var key in initial_units) {
+		var unit = initial_units[key];
+		id2team[unit.id] = unit.team;
+	    }
+
+	    data.shift();
+
+	    function render(t) {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+		for (var i = 0; i < h; i += 1) {
+		    for (var j = 0; j < w; j += 1) {
+			// Black out impassable squares
+			if (!earth_map[i][j]) {
+			    ctx.fillStyle = '#000'
+				ctx.fillRect(j * (500 / w), i * (500 / h),
+					500 / w, 500 / h);
+			}
+
+			// TODO write amount of Kryptonite at location
+			ctx.fillStyle = '#888';
+			ctx.fillText(karbonite_map[i][j].toString(),
+			    (j + 0.5) * (500 / w), (i + 0.5) * 500 / h);
+		    }
+		}
+
+		reserves[t % 2] = data[t].karbonite;
+
+		document.getElementById('turn').innerText = (t - t % 4) / 4;
+		document.getElementById('red').innerText = reserves[0].toString();
+		document.getElementById('blue').innerText = reserves[1].toString();
+
+		for (var i = 0; i < data[t].additional_changes.length; i += 1) {
+		    var change = data[t].additional_changes[i];
+		    if (change.KarboniteChanged != null && change.KarboniteChanged.location.planet === 'Earth') {
+			karbonite_map[
+			    change.KarboniteChanged.location.y
+			][
+			    change.KarboniteChanged.location.x
+			] = change.KarboniteChanged.new_amount;
+		    }
+		}
+
+		for (var i = 0; i < data[t].units.length; i += 1) {
+		    var unit = data[t].units[i];
+		    if (unit.location.planet = 'Earth') {
+			if (!(unit.id in id2team )) {
+			    id2team[unit.id] = TEAMS[t % 2];
+			}
+			ctx.fillStyle = TEAM_COLOR[id2team[unit.id]];
+			ctx.fillRect(
+				unit.location.x * 500 / w, unit.location.y * 500 / h,
+				500 / w, 500 / h
+			    )
+		    }
+		}
+
+		if (t + 1 < data.length) {
+		    current_anim_timeout = setTimeout(function() {
+			render(t + 1);
+		    }, timeout);
+		}
+	    }
+	    render(0);
+	    document.getElementById('restart').addEventListener('click', function() {
+		clearTimeout(current_anim_timeout);
+		karbonite_map = original_karbonite_map.map(function(x) { return x.slice(0); });
+		render(0);
+	    });
+	}
+    };
+    q.send();
+
+
+}
+document.getElementById('fname').addEventListener('keydown', function(e) {
+    if (e.which === 13) {
+	visualize(document.getElementById('fname').value);
+    }
+});
+</script>
+</body>
+</html>

@@ -9,33 +9,91 @@ General TODOs:
     - Visualize health bars on units
     - Make visualizations for attacks that make clear who is attacking whom
     - Show how many of each kind of unit each player has
-    - Implement a scrubber
+    - Implement a scrubber (Mostly done)
 -->
+
+<!-- Here's a simple stylesheet to make things look a bit better. -->
+<style>
+    /* font includes */
+    @import url('https://fonts.googleapis.com/css?family=Inconsolata|Roboto');
+    
+    h1 {
+        font-family: Inconsolata;
+        font-size: 2.5em;
+        text-align: center;
+    }
+    
+    h2 {
+        font-family: Roboto;
+        font-size: 2em;
+        text-align: center;
+    }
+    
+    /* this also takes care of canvas centering, how convenient */
+    div {
+        font-family: Roboto;
+        font-size: 1em;
+        text-align: center;
+    }
+    
+    button {
+        font-family: Roboto;
+        font-size: 1em;
+    }
+    
+    input {
+        font-family: Inconsolata;
+        font-size: 1em;
+    }
+    
+    /* center the table and set font */
+    table {
+        font-family: Roboto;
+        font-size: 1em;
+        
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    /* make table a bit more readable */
+    th, td { padding: 0px 20px; }
+</style>
+    
 <body>
-<div><label for="fname">If you're hosting the website locally:</label> <input id="fname" placeholder="filename"/></div>
-<div><label for="ffile">Upload a file:</label> <input id="ffile" type="file"/></div>
-<div><button id="restart">Restart</button></div>
-<div id="loading"></div>
-<div><input id="timeout" placeholder="timeout" value="10"/></div>
-<table>
-<tr><td>Turn</td><td>Red</td><td>Blue</td</tr>
-<tr><td><span id="turn"></span></td><td><span id="red"></span></td><td><span id="blue"></span></td></tr>
-</table>
-<canvas id="main" width=500 height=500 style="border: 1px solid #000"></canvas>
+    <h1>bc18-tinyviewer</h1>
+    <div><label for="fname">If you're hosting the website locally:</label> <input id="fname" placeholder="filepath"/></div>
+    <div><label for="ffile">Upload a file:</label> <input id="ffile" type="file"/></div>
+    <div id="loading"></div>
+    <div>
+        <label for="timeout">Set time delay per turn (ms):</label>
+        <input id="timeout" placeholder="timeout" min="1" type="number"/>
+    </div>
+    <div>
+        <label for="turnslider">Go to turn #:</label>
+        <input id="turnslider" type="range" min="1"/>
+        <button id="pause">Pause</button>
+    </div>
+    <br/>
+    <table>
+        <tr><th>Turn #</th><th>Red Karbonite</th><th>Blue Karbonite</th></tr>
+        <tr><td><span id="turn"></span></td><td><span id="red"></span></td><td><span id="blue"></span></td></tr>
+    </table>
+    <div><canvas id="main" width=500 height=500 style="border: 1px solid #000"></canvas></div>
+    <h2 id="winner"></h2>
 
 <script>
 var canvas = document.getElementById('main');
 var ctx = canvas.getContext('2d');
 
 var timeout = 10;
+var winner;
+document.getElementById('timeout').value = timeout;
 
 /*
 Allow setting replay speed
 */
-document.getElementById('timeout').addEventListener('keydown', function(e) {
-    if (e.which == 13) {
-        timeout = Number(document.getElementById('timeout').value);
-    }
+document.getElementById('timeout').addEventListener('change', function(e) {
+    timeout = document.getElementById('timeout').value;
 });
 
 /*
@@ -51,18 +109,36 @@ function visualize(data) {
     var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
     var id2team = {};
     var earth_map, mars_map;
-    var reserves = [100, 100];
+    var reserves = [[100, 100]]; // Precomped for every turn
     var current_anim_timeout = null;
+    
+    // Whether or not the slider is currently being held down.
+    // This is used because the input event only fires
+    // when the slider's value is actively changing,
+    // but we want it to pause even if it is held in position.
+    var slider_held = false;
+    
+    // Whether or not we're currently paused.
+    var paused = false;
 
+    // Determine who won
+    winner = data['metadata'].winner;
+    // TODO Check if this is correct, it might be the other way round
+    if (winner == 'player1') winner = 'Blue';
+    else winner = 'Red';
+    
     // Parse each turn from the replay file
     data = data['message'].map(JSON.parse);
+    
+    // Clear info on the winner
+    document.getElementById('winner').innerText = '';
 
-    // Get impassable squares and Karbonite for Earth
+    // Get impassable squares for Earth
     earth_map = data[0].world.planet_maps.Earth.is_passable_terrain;
-    karbonite_map = data[0].world.planet_maps.Earth.initial_karbonite;
-
-    // Save the original Karbonite map in case we want to restart
-    var original_karbonite_map = karbonite_map.map(function(x) { return x.slice(0); });
+    
+    // Get Karbonite data
+    // We'll precomp this for every turn
+    karbonite_maps = [data[0].world.planet_maps.Earth.initial_karbonite];
 
     // Convenience dimension variables
     var w = earth_map[0].length, h = earth_map.length;
@@ -78,6 +154,57 @@ function visualize(data) {
     // Pop off the first "turn", whic is not a turn
     // but instead an initialization object
     data.shift();
+    
+    // We will now precomp Karbonite data,
+    // reserves data, and unit teams, to allow
+    // scrubbing.
+    for (var t = 0; t < data.length; t += 1) {
+        // Update Karbonite reserves if necessary.
+        // TODO:
+        // This currently will result in updating reserves
+        // _before_ being displayed for a turn.
+        // If this should occur _after_ being displayed
+        // for a turn instead, swap the two lines below.
+        reserves[reserves.length - 1][t % 2] = data[t].karbonite;
+        reserves.push(reserves[reserves.length - 1].slice(0));
+        
+        // If Karbonite on the board has changed, update our current counts
+        // TODO:
+        // This currently will result in updating counts
+        // _after_ being displayed for a turn.
+        // If this should occur _before_ being displayed
+        // for a turn instead, put the push after the for loop.
+        // TODO: handle mars updates here
+        karbonite_maps.push(karbonite_maps[karbonite_maps.length - 1].map(function(x) { return x.slice(0); }));
+        for (var i = 0; i < data[t].additional_changes.length; i += 1) {
+            var change = data[t].additional_changes[i];
+            if (change.KarboniteChanged != null && change.KarboniteChanged.location.planet === 'Earth') {
+                karbonite_maps[
+                    karbonite_maps.length - 1
+                ][
+                    change.KarboniteChanged.location.y
+                ][
+                    change.KarboniteChanged.location.x
+                ] = change.KarboniteChanged.new_amount;
+            }
+        }
+        
+        // Precomp units
+        for (var i = 0; i < data[t].units.length; i += 1) {
+            var unit = data[t].units[i];
+            if (unit.location.planet = 'Earth') {
+                // If this unit has never been seen before, it must
+                // have just been made. Thus it belongs to the current player.
+                if (!(unit.id in id2team)) {
+                    id2team[unit.id] = TEAMS[t % 2];
+                }
+            }
+        }
+    }
+    
+    // set the maximum turn we could slide to
+    var t = data.length - 1;
+    document.getElementById('turnslider').max = (t - t % 4) / 4 + 1;
 
     // Now, to render an animation frame:
     function render(t) {
@@ -93,44 +220,26 @@ function visualize(data) {
                                 500 / w, 500 / h);
                 }
 
-                // Write amount of Kryptonite at location
+                // Write amount of Karbonite at location
                 ctx.fillStyle = '#888';
-                ctx.fillText(karbonite_map[i][j].toString(),
+                ctx.fillText(karbonite_maps[t][i][j].toString(),
                         (j + 0.5) * (500 / w), (i + 0.5) * 500 / h);
             }
         }
 
-        // Update Karbonite reserves if necessary
-        reserves[t % 2] = data[t].karbonite;
-
+        // This sets the value of the slider to the current turn.
+        // Note: Turn number should be 1-indexed when displayed.
+        document.getElementById('turnslider').value = (t - t % 4) / 4 + 1;
+        
         // Render Karbonite reserves and turn number
-        document.getElementById('turn').innerText = (t - t % 4) / 4;
-        document.getElementById('blue').innerText = reserves[0].toString();
-        document.getElementById('red').innerText = reserves[1].toString();
-
-        // If Karbonite on the board has changed, update our current counts
-        // TODO should this go before or after rendering the Karbonite counts?
-        for (var i = 0; i < data[t].additional_changes.length; i += 1) {
-            var change = data[t].additional_changes[i];
-            if (change.KarboniteChanged != null && change.KarboniteChanged.location.planet === 'Earth') {
-                karbonite_map[
-                    change.KarboniteChanged.location.y
-                ][
-                change.KarboniteChanged.location.x
-                ] = change.KarboniteChanged.new_amount;
-            }
-        }
+        document.getElementById('turn').innerText = document.getElementById('turnslider').value.toString();
+        document.getElementById('blue').innerText = reserves[t][0].toString();
+        document.getElementById('red').innerText = reserves[t][1].toString();
 
         // Render units
         for (var i = 0; i < data[t].units.length; i += 1) {
             var unit = data[t].units[i];
             if (unit.location.planet = 'Earth') {
-                // If this unit has never been seen before, it must
-                // have just been made. Thus it belongs to the current player.
-                if (!(unit.id in id2team)) {
-                    id2team[unit.id] = TEAMS[t % 2];
-                }
-
                 // Render the unit in the correct color.
                 // TODO somehow distinguish between unit types.
                 ctx.fillStyle = TEAM_COLOR[id2team[unit.id]];
@@ -143,27 +252,54 @@ function visualize(data) {
 
         // Schedule next animation frame
         if (t + 1 < data.length) {
+            var new_t = t + 1;
+            if (slider_held || paused) {
+                // We want to pause.
+                new_t = t;
+            }
+            
             current_anim_timeout = setTimeout(function() {
-                render(t + 1);
+                render(new_t);
             }, timeout);
+            document.getElementById('winner').innerText = '';
+        } else {
+            // It's the end
+            document.getElementById('winner').innerText = winner + ' wins!';
+            document.getElementById('winner').style.color = TEAM_COLOR[winner];
         }
     }
-
-    render(0);
-
-    // Restart button cancels next animation frame and starts
-    // over at 0.
-    document.getElementById('restart').addEventListener('click', function() {
+    
+    // A bunch of slider event handlers
+    document.getElementById('turnslider').addEventListener('input', function(e) {
+        // Clear current timeout
         clearTimeout(current_anim_timeout);
-        karbonite_map = original_karbonite_map.map(function(x) { return x.slice(0); });
-        render(0);
+        
+        // Render the first value of t represented by the given turn
+        var t = (this.value - 1) * 4;
+        render(t);
     });
+    
+    document.getElementById('turnslider').addEventListener('mousedown', function(e) {
+        slider_held = true;
+    });
+    
+    document.getElementById('turnslider').addEventListener('mouseup', function(e) {
+        slider_held = false; 
+    });
+    
+    document.getElementById('pause').addEventListener('click', function(e) {
+        paused = !paused;
+        if (paused) this.innerText = 'Resume';
+        else this.innerText = 'Pause';
+    })
+    
+    render(0);
 }
 
 // Pressing "enter" on the input starts the request for the replay.
 document.getElementById('fname').addEventListener('keydown', function(e) {
     if (e.which === 13) {
-        var path = document.getElementById('fname').value;
+        var path = this.value;
 
         // Request the replay file
         var q = new XMLHttpRequest();
@@ -187,7 +323,7 @@ document.getElementById('fname').addEventListener('keydown', function(e) {
 });
 
 document.getElementById('ffile').addEventListener('change', function(e) {
-    var file = document.getElementById('ffile').files[0];
+    var file = this.files[0];
 
     // Read the contents of the file
     var reader = new FileReader();

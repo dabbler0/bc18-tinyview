@@ -85,6 +85,8 @@ General TODOs:
 
 var mousedown_listener, mouseup_listener, input_listener, needs_clear = false;
 
+var MAX_HEALTHS = {'Worker': 100, 'Knight': 250, 'Factory': 300};
+
 var BORDER_WIDTH = 0.2;
 var canvas = document.getElementById('main');
 var ctx = canvas.getContext('2d');
@@ -283,6 +285,11 @@ function visualize(data) {
                     ctx.fillStyle = '#888';
                 }
 
+                else if (unit.unit_type == "Knight") {
+                    // Knights will be some kind of maroon
+                    ctx.fillStyle = '#800';
+                }
+
                 else {
                     // Unimplemented unit type
                     ctx.fillStyle = '#FFF';
@@ -295,10 +302,21 @@ function visualize(data) {
                 )
 
                 // The inside of the square represents the team allegiance
-                ctx.fillStyle = TEAM_COLOR[id2team[unit.id]];
+                // and also health
+                var health_ratio = unit.health / MAX_HEALTHS[unit.unit_type];
+                ctx.fillStyle = '#FFF';
                 ctx.fillRect(
                     (unit.location.x + BORDER_WIDTH) * 500 / w, (unit.location.y + BORDER_WIDTH) * 500 / h,
                     (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
+                );
+                ctx.fillStyle = ctx.strokeStyle = TEAM_COLOR[id2team[unit.id]];
+                ctx.strokeRect(
+                    (unit.location.x + BORDER_WIDTH) * 500 / w, (unit.location.y + BORDER_WIDTH) * 500 / h,
+                    (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
+                );
+                ctx.fillRect(
+                    (unit.location.x + BORDER_WIDTH) * 500 / w, (unit.location.y + BORDER_WIDTH + (1 - 2 * BORDER_WIDTH) * (1 - health_ratio)) * 500 / h,
+                    (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * health_ratio * 500 / h
                 );
 
                 ctx.globalAlpha = 1;

@@ -12,7 +12,9 @@ General TODOs:
     - Implement a scrubber
 -->
 <body>
-<div><input id="fname" placeholder="filename"/> <button id="restart">Restart</button></div>
+<div><label for="fname">If you're hosting the website locally:</label> <input id="fname" placeholder="filename"/></div>
+<div><label for="ffile">Upload a file:</label> <input id="ffile" type="file"/></div>
+<div><button id="restart">Restart</button></div>
 <div id="loading"></div>
 <div><input id="timeout" placeholder="timeout" value="10"/></div>
 <table>
@@ -37,14 +39,13 @@ document.getElementById('timeout').addEventListener('keydown', function(e) {
 });
 
 /*
-Visualize a replay file from a given location
+Visualize a replay file given a JSON object
+corresponding to the file.
+(This is prior to the messages within the replay file,
+ which are strings corresponding to JSON objects,
+ being parsed.)
 */
-function visualize(path) {
-    // Request the replay file
-    var q = new XMLHttpRequest();
-    q.open('GET', path, true);
-    document.getElementById('loading').innerText = 'Loading...';
-
+function visualize(data) {
     // Globals
     var TEAMS = ['Red', 'Blue'];
     var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
@@ -53,128 +54,156 @@ function visualize(path) {
     var reserves = [100, 100];
     var current_anim_timeout = null;
 
-    // Replay file arrives -- callback:
-    q.onreadystatechange = function() {
-        if (q.readyState == XMLHttpRequest.DONE) {
-            document.getElementById('loading').innerText = 'Done.';
+    // Parse each turn from the replay file
+    data = data['message'].map(JSON.parse);
 
-            // Parse each turn from the replay file
-            var data = JSON.parse(q.responseText);
-            data = data['message'].map(JSON.parse);
+    // Get impassable squares and Karbonite for Earth
+    earth_map = data[0].world.planet_maps.Earth.is_passable_terrain;
+    karbonite_map = data[0].world.planet_maps.Earth.initial_karbonite;
 
-            // Get impassable squares and Karbonite for Earth
-            earth_map = data[0].world.planet_maps.Earth.is_passable_terrain;
-            karbonite_map = data[0].world.planet_maps.Earth.initial_karbonite;
+    // Save the original Karbonite map in case we want to restart
+    var original_karbonite_map = karbonite_map.map(function(x) { return x.slice(0); });
 
-            // Save the original Karbonite map in case we want to restart
-            var original_karbonite_map = karbonite_map.map(function(x) { return x.slice(0); });
+    // Convenience dimension variables
+    var w = earth_map[0].length, h = earth_map.length;
 
-            // Convenience dimension variables
-            var w = earth_map[0].length, h = earth_map.length;
+    // Get the team identities of the initial units
+    // (these are not given ever again so we need to remember)
+    var initial_units = data[0].world.planet_states.Earth.units
+    for (var key in initial_units) {
+        var unit = initial_units[key];
+        id2team[unit.id] = unit.team;
+    }
 
-            // Get the team identities of the initial units
-            // (these are not given ever again so we need to remember)
-            var initial_units = data[0].world.planet_states.Earth.units
-            for (var key in initial_units) {
-                var unit = initial_units[key];
-                id2team[unit.id] = unit.team;
+    // Pop off the first "turn", whic is not a turn
+    // but instead an initialization object
+    data.shift();
+
+    // Now, to render an animation frame:
+    function render(t) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw the map
+        for (var i = 0; i < h; i += 1) {
+            for (var j = 0; j < w; j += 1) {
+                // Black out impassable squares
+                if (!earth_map[i][j]) {
+                    ctx.fillStyle = '#000'
+                        ctx.fillRect(j * (500 / w), i * (500 / h),
+                                500 / w, 500 / h);
+                }
+
+                // Write amount of Kryptonite at location
+                ctx.fillStyle = '#888';
+                ctx.fillText(karbonite_map[i][j].toString(),
+                        (j + 0.5) * (500 / w), (i + 0.5) * 500 / h);
             }
-
-            // Pop off the first "turn", whic is not a turn
-            // but instead an initialization object
-            data.shift();
-
-            // Now, to render an animation frame:
-            function render(t) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                // Draw the map
-                for (var i = 0; i < h; i += 1) {
-                    for (var j = 0; j < w; j += 1) {
-                        // Black out impassable squares
-                        if (!earth_map[i][j]) {
-                            ctx.fillStyle = '#000'
-                                ctx.fillRect(j * (500 / w), i * (500 / h),
-                                        500 / w, 500 / h);
-                        }
-
-                        // Write amount of Kryptonite at location
-                        ctx.fillStyle = '#888';
-                        ctx.fillText(karbonite_map[i][j].toString(),
-                                (j + 0.5) * (500 / w), (i + 0.5) * 500 / h);
-                    }
-                }
-
-                // Update Karbonite reserves if necessary
-                reserves[t % 2] = data[t].karbonite;
-
-                // Render Karbonite reserves and turn number
-                document.getElementById('turn').innerText = (t - t % 4) / 4;
-                document.getElementById('blue').innerText = reserves[0].toString();
-                document.getElementById('red').innerText = reserves[1].toString();
-
-                // If Karbonite on the board has changed, update our current counts
-                // TODO should this go before or after rendering the Karbonite counts?
-                for (var i = 0; i < data[t].additional_changes.length; i += 1) {
-                    var change = data[t].additional_changes[i];
-                    if (change.KarboniteChanged != null && change.KarboniteChanged.location.planet === 'Earth') {
-                        karbonite_map[
-                            change.KarboniteChanged.location.y
-                        ][
-                        change.KarboniteChanged.location.x
-                        ] = change.KarboniteChanged.new_amount;
-                    }
-                }
-
-                // Render units
-                for (var i = 0; i < data[t].units.length; i += 1) {
-                    var unit = data[t].units[i];
-                    if (unit.location.planet = 'Earth') {
-                        // If this unit has never been seen before, it must
-                        // have just been made. Thus it belongs to the current player.
-                        if (!(unit.id in id2team)) {
-                            id2team[unit.id] = TEAMS[t % 2];
-                        }
-
-                        // Render the unit in the correct color.
-                        // TODO somehow distinguish between unit types.
-                        ctx.fillStyle = TEAM_COLOR[id2team[unit.id]];
-                        ctx.fillRect(
-                            unit.location.x * 500 / w, unit.location.y * 500 / h,
-                            500 / w, 500 / h
-                        )
-                    }
-                }
-
-                // Schedule next animation frame
-                if (t + 1 < data.length) {
-                    current_anim_timeout = setTimeout(function() {
-                        render(t + 1);
-                    }, timeout);
-                }
-            }
-
-            render(0);
-
-            // Restart button cancels next animation frame and starts
-            // over at 0.
-            document.getElementById('restart').addEventListener('click', function() {
-                clearTimeout(current_anim_timeout);
-                karbonite_map = original_karbonite_map.map(function(x) { return x.slice(0); });
-                render(0);
-            });
         }
-    };
-    q.send();
 
+        // Update Karbonite reserves if necessary
+        reserves[t % 2] = data[t].karbonite;
 
+        // Render Karbonite reserves and turn number
+        document.getElementById('turn').innerText = (t - t % 4) / 4;
+        document.getElementById('blue').innerText = reserves[0].toString();
+        document.getElementById('red').innerText = reserves[1].toString();
+
+        // If Karbonite on the board has changed, update our current counts
+        // TODO should this go before or after rendering the Karbonite counts?
+        for (var i = 0; i < data[t].additional_changes.length; i += 1) {
+            var change = data[t].additional_changes[i];
+            if (change.KarboniteChanged != null && change.KarboniteChanged.location.planet === 'Earth') {
+                karbonite_map[
+                    change.KarboniteChanged.location.y
+                ][
+                change.KarboniteChanged.location.x
+                ] = change.KarboniteChanged.new_amount;
+            }
+        }
+
+        // Render units
+        for (var i = 0; i < data[t].units.length; i += 1) {
+            var unit = data[t].units[i];
+            if (unit.location.planet = 'Earth') {
+                // If this unit has never been seen before, it must
+                // have just been made. Thus it belongs to the current player.
+                if (!(unit.id in id2team)) {
+                    id2team[unit.id] = TEAMS[t % 2];
+                }
+
+                // Render the unit in the correct color.
+                // TODO somehow distinguish between unit types.
+                ctx.fillStyle = TEAM_COLOR[id2team[unit.id]];
+                ctx.fillRect(
+                    unit.location.x * 500 / w, unit.location.y * 500 / h,
+                    500 / w, 500 / h
+                )
+            }
+        }
+
+        // Schedule next animation frame
+        if (t + 1 < data.length) {
+            current_anim_timeout = setTimeout(function() {
+                render(t + 1);
+            }, timeout);
+        }
+    }
+
+    render(0);
+
+    // Restart button cancels next animation frame and starts
+    // over at 0.
+    document.getElementById('restart').addEventListener('click', function() {
+        clearTimeout(current_anim_timeout);
+        karbonite_map = original_karbonite_map.map(function(x) { return x.slice(0); });
+        render(0);
+    });
 }
 
 // Pressing "enter" on the input starts the request for the replay.
 document.getElementById('fname').addEventListener('keydown', function(e) {
     if (e.which === 13) {
+        var path = document.getElementById('fname').value;
+
+        // Request the replay file
+        var q = new XMLHttpRequest();
+        q.open('GET', path, true);
+        document.getElementById('loading').innerText = 'Loading...';
         visualize(document.getElementById('fname').value);
+
+        // Replay file arrives -- callback:
+        q.onreadystatechange = function() {
+            if (q.readyState == XMLHttpRequest.DONE) {
+                document.getElementById('loading').innerText = 'Done.';
+
+                // Parse replay file
+                var data = JSON.parse(q.responseText);
+
+                visualize(data);
+            }
+        };
+
+        q.send();
     }
+});
+
+document.getElementById('ffile').addEventListener('change', function(e) {
+    var file = document.getElementById('ffile').files[0];
+
+    // Read the contents of the file
+    var reader = new FileReader();
+
+    // FileReader loads -- callback:
+    reader.onload = function(e) {
+        var txt = reader.result;
+
+        // Parse replay file
+        var data = JSON.parse(txt);
+
+        visualize(data);
+    }
+
+    reader.readAsText(file);
 });
 </script>
 </body>

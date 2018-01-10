@@ -1,7 +1,7 @@
 Battlecode 2018 Tiny Viewer
 ===========================
 
-Tiny HTML5-based viewer for Battlecode 2018 replays. Not necessarily complaint with anything, as it was hacked out by manually inspecting replay files and doing what seemed right.
+Tiny HTML5-based viewer for Battlecode 2018 replays. Not necessarily compliant with anything, as it was hacked out by manually inspecting replay files and doing what seemed right.
 
 Run this by running a localhost server. For instance, suppose you have the following file structure:
 

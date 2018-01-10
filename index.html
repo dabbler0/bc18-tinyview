@@ -25,8 +25,6 @@ General TODOs:
 var canvas = document.getElementById('main');
 var ctx = canvas.getContext('2d');
 
-var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
-
 var timeout = 10;
 
 /*
@@ -49,6 +47,7 @@ function visualize(path) {
 
     // Globals
     var TEAMS = ['Red', 'Blue'];
+    var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
     var id2team = {};
     var earth_map, mars_map;
     var reserves = [100, 100];

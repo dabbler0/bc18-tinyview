@@ -25,6 +25,7 @@ Contributing
 ------------
 
 This viewer is not very good and needs improvement. Fork this repository and make pull requests and I will merge them when I'm paying attention. General things that need to be done:
+
     - Make sure we're not making off-by-one-turn errors with when things should be rendered
     - Visualize Mars at all
     - Distinguish between different types of units

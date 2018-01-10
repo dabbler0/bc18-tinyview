@@ -169,7 +169,6 @@ document.getElementById('fname').addEventListener('keydown', function(e) {
         var q = new XMLHttpRequest();
         q.open('GET', path, true);
         document.getElementById('loading').innerText = 'Loading...';
-        visualize(document.getElementById('fname').value);
 
         // Replay file arrives -- callback:
         q.onreadystatechange = function() {

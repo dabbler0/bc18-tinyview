@@ -82,6 +82,9 @@ General TODOs:
     <h2 id="winner"></h2>
 
 <script>
+
+var mousedown_listener, mouseup_listener, input_listener, needs_clear = false;
+
 var BORDER_WIDTH = 0.2;
 var canvas = document.getElementById('main');
 var ctx = canvas.getContext('2d');
@@ -104,6 +107,8 @@ corresponding to the file.
  which are strings corresponding to JSON objects,
  being parsed.)
 */
+var current_anim_timeout = null;
+
 function visualize(data) {
     // Globals
     var TEAMS = ['Red', 'Blue'];
@@ -112,7 +117,10 @@ function visualize(data) {
     var maturation_times = {};
     var earth_map, mars_map;
     var reserves = [[100, 100]]; // Precomped for every turn
-    var current_anim_timeout = null;
+
+    if (current_anim_timeout != null) {
+        clearTimeout(current_anim_timeout);
+    }
     
     // Whether or not the slider is currently being held down.
     // This is used because the input event only fires
@@ -317,7 +325,15 @@ function visualize(data) {
     }
     
     // A bunch of slider event handlers
-    document.getElementById('turnslider').addEventListener('input', function(e) {
+    if (needs_clear) {
+        document.getElementById('turnslider').removeEventListener('input', input_listener);
+        document.getElementById('turnslider').removeEventListener('mousedown', mousedown_listener);
+        document.getElementById('turnslider').removeEventListener('mouseup', mouseup_listener);
+    }
+
+    needs_clear = true;
+
+    document.getElementById('turnslider').addEventListener('input', input_listener = function(e) {
         // Clear current timeout
         clearTimeout(current_anim_timeout);
         
@@ -326,11 +342,11 @@ function visualize(data) {
         render(t);
     });
     
-    document.getElementById('turnslider').addEventListener('mousedown', function(e) {
+    document.getElementById('turnslider').addEventListener('mousedown', mousedown_listener = function(e) {
         slider_held = true;
     });
     
-    document.getElementById('turnslider').addEventListener('mouseup', function(e) {
+    document.getElementById('turnslider').addEventListener('mouseup', mouseup_listener = function(e) {
         slider_held = false; 
     });
     

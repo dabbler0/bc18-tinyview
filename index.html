@@ -82,6 +82,7 @@ General TODOs:
     <h2 id="winner"></h2>
 
 <script>
+var BORDER_WIDTH = 0.2;
 var canvas = document.getElementById('main');
 var ctx = canvas.getContext('2d');
 
@@ -108,6 +109,7 @@ function visualize(data) {
     var TEAMS = ['Red', 'Blue'];
     var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
     var id2team = {};
+    var maturation_times = {};
     var earth_map, mars_map;
     var reserves = [[100, 100]]; // Precomped for every turn
     var current_anim_timeout = null;
@@ -197,6 +199,19 @@ function visualize(data) {
                 // have just been made. Thus it belongs to the current player.
                 if (!(unit.id in id2team)) {
                     id2team[unit.id] = TEAMS[t % 2];
+
+                    // Factories, before they reach full health,
+                    // are actually just blueprints
+                    if (unit.unit_type == 'Factory' || unit.unit_type == 'Rocket') {
+                        maturation_times[unit.id] = Infinity;
+                    }
+                }
+
+                // Factories and rockets mature when they reach full health
+                if ((unit.unit_type == 'Factory' && unit.health == 300 ||
+                        unit.unit_type == 'Rocket' && unit.health == 200) &&
+                        maturation_times[unit.id] == Infinity) {
+                    maturation_times[unit.id] = t;
                 }
             }
         }
@@ -241,12 +256,44 @@ function visualize(data) {
             var unit = data[t].units[i];
             if (unit.location.planet = 'Earth') {
                 // Render the unit in the correct color.
-                // TODO somehow distinguish between unit types.
-                ctx.fillStyle = TEAM_COLOR[id2team[unit.id]];
+
+                // Blueprints will be given an alpha
+                if ((unit.unit_type === "Factory" || unit.unit_type === "Rocket") &&
+                        maturation_times[unit.id] > t) {
+                    ctx.globalAlpha = 0.5;
+                }
+
+                // The border of the square will represent the
+                // unit type.
+                if (unit.unit_type === "Worker") {
+                    // Workers will be yellow, because whatever.
+                    ctx.fillStyle = '#FF0';
+                }
+                
+                else if (unit.unit_type === "Factory") {
+                    // Factories will be gray
+                    ctx.fillStyle = '#888';
+                }
+
+                else {
+                    // Unimplemented unit type
+                    ctx.fillStyle = '#FFF';
+                }
+
+                // Fill the border
                 ctx.fillRect(
                     unit.location.x * 500 / w, unit.location.y * 500 / h,
                     500 / w, 500 / h
                 )
+
+                // The inside of the square represents the team allegiance
+                ctx.fillStyle = TEAM_COLOR[id2team[unit.id]];
+                ctx.fillRect(
+                    (unit.location.x + BORDER_WIDTH) * 500 / w, (unit.location.y + BORDER_WIDTH) * 500 / h,
+                    (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
+                );
+
+                ctx.globalAlpha = 1;
             }
         }
 

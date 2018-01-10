@@ -110,8 +110,8 @@ function visualize(path) {
 
                 // Render Karbonite reserves and turn number
                 document.getElementById('turn').innerText = (t - t % 4) / 4;
-                document.getElementById('red').innerText = reserves[0].toString();
-                document.getElementById('blue').innerText = reserves[1].toString();
+                document.getElementById('blue').innerText = reserves[0].toString();
+                document.getElementById('red').innerText = reserves[1].toString();
 
                 // If Karbonite on the board has changed, update our current counts
                 // TODO should this go before or after rendering the Karbonite counts?

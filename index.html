@@ -85,7 +85,7 @@ General TODOs:
 
 var mousedown_listener, mouseup_listener, input_listener, needs_clear = false;
 var HEAD_SIZE = 0.3;
-var MAX_HEALTHS = {'Worker': 100, 'Knight': 250, 'Factory': 300, 'Ranger': 200};
+var MAX_HEALTHS = {'Worker': 100, 'Knight': 250, 'Factory': 300, 'Ranger': 200, 'Mage': 80};
 
 var BORDER_WIDTH = 0.2;
 var canvas = document.getElementById('main');
@@ -263,11 +263,13 @@ function visualize(data) {
 
         // Render units
         var unit_locations = {};
+        var unit_types = {};
         for (var i = 0; i < data[t].units.length; i += 1) {
             var unit = data[t].units[i];
             if (unit.location.planet = 'Earth') {
                 // Render the unit in the correct color.
                 unit_locations[unit.id] = [unit.location.x, unit.location.y];
+                unit_types[unit.id] = unit.unit_type;
 
                 // Blueprints will be given an alpha
                 if ((unit.unit_type === "Factory" || unit.unit_type === "Rocket") &&
@@ -295,6 +297,11 @@ function visualize(data) {
                 else if (unit.unit_type == "Ranger") {
                     // Rangers will be some kind of dark green
                     ctx.fillStyle = '#080';
+                }
+
+                else if (unit.unit_type == "Mage") {
+                    // Rangers will be some kind of dark blue
+                    ctx.fillStyle = '#008';
                 }
 
                 else {
@@ -336,7 +343,6 @@ function visualize(data) {
             for (var i = 0; i < data[t + 1].changes.length; i += 1) {
                 var change = data[t + 1].changes[i];
                 if ('Attack' in change) {
-                    console.log('rendering an attack.');
                     var attack = change['Attack'];
                     var target = attack.target_unit_id, robot = attack.robot_id;
 
@@ -358,6 +364,23 @@ function visualize(data) {
                         HEAD_SIZE * 500 / w,
                         HEAD_SIZE * 500 / h
                     );
+
+                    if (unit_types[robot] == 'Mage') {
+                        for (var dx = -1; dx <= 1; dx += 1) {
+                            for (var dy = -1; dy <= 1; dy += 1) {
+                                ctx.strokeStyle = '#F0F';
+                                ctx.lineWidth = 5;
+                                ctx.beginPath();
+                                ctx.moveTo(
+                                    (unit_locations[target][0] + 0.5) * 500 / w,
+                                    (unit_locations[target][1] + 0.5) * 500 / h);
+                                ctx.lineTo(
+                                    (unit_locations[target][0] + 0.5 + dx) * 500 / w,
+                                    (unit_locations[target][1] + 0.5 + dy) * 500 / h);
+                                ctx.stroke();
+                            }
+                        }
+                    }
                 }
             }
         }

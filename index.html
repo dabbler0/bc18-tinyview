@@ -230,6 +230,9 @@ function visualize(data) {
     // set the maximum turn we could slide to
     var t = data.length - 1;
     document.getElementById('turnslider').max = (t - t % 4) / 4 + 1;
+    
+    // This is used to invert the y-axis
+    function flipY(oy) { return (h - oy - 1); }
 
     // Now, to render an animation frame:
     function render(t) {
@@ -238,17 +241,20 @@ function visualize(data) {
         // Draw the map
         for (var i = 0; i < h; i += 1) {
             for (var j = 0; j < w; j += 1) {
+                // Flip along y-axis
+                var px = j, py = flipY(i);
+                
                 // Black out impassable squares
                 if (!earth_map[i][j]) {
                     ctx.fillStyle = '#000'
-                        ctx.fillRect(j * (500 / w), i * (500 / h),
+                        ctx.fillRect(px * (500 / w), py * (500 / h),
                                 500 / w, 500 / h);
                 }
 
                 // Write amount of Karbonite at location
                 ctx.fillStyle = '#888';
                 ctx.fillText(karbonite_maps[t][i][j].toString(),
-                        (j + 0.5) * (500 / w), (i + 0.5) * 500 / h);
+                        (px + 0.5) * (500 / w), (py + 0.5) * 500 / h);
             }
         }
 
@@ -308,10 +314,15 @@ function visualize(data) {
                     // Unimplemented unit type
                     ctx.fillStyle = '#FFF';
                 }
+                
+                // Flip along the y-axis for drawing.
+                // This is because canvas is top-left based.
+                var px = unit.location.x;
+                var py = flipY(unit.location.y);
 
                 // Fill the border
                 ctx.fillRect(
-                    unit.location.x * 500 / w, unit.location.y * 500 / h,
+                    px * 500 / w, py * 500 / h,
                     500 / w, 500 / h
                 )
 
@@ -320,17 +331,17 @@ function visualize(data) {
                 var health_ratio = unit.health / MAX_HEALTHS[unit.unit_type];
                 ctx.fillStyle = '#FFF';
                 ctx.fillRect(
-                    (unit.location.x + BORDER_WIDTH) * 500 / w, (unit.location.y + BORDER_WIDTH) * 500 / h,
+                    (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH) * 500 / h,
                     (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
                 );
                 ctx.fillStyle = ctx.strokeStyle = TEAM_COLOR[id2team[unit.id]];
                 ctx.lineWidth = 1;
                 ctx.strokeRect(
-                    (unit.location.x + BORDER_WIDTH) * 500 / w, (unit.location.y + BORDER_WIDTH) * 500 / h,
+                    (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH) * 500 / h,
                     (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
                 );
                 ctx.fillRect(
-                    (unit.location.x + BORDER_WIDTH) * 500 / w, (unit.location.y + BORDER_WIDTH + (1 - 2 * BORDER_WIDTH) * (1 - health_ratio)) * 500 / h,
+                    (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH + (1 - 2 * BORDER_WIDTH) * (1 - health_ratio)) * 500 / h,
                     (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * health_ratio * 500 / h
                 );
 
@@ -339,32 +350,47 @@ function visualize(data) {
         }
 
         // Render attacks
+        // (these are technically made the next turn,
+        //  but are rendered this turn for ease of viewing)
         if (t + 1 < data.length) {
             for (var i = 0; i < data[t + 1].changes.length; i += 1) {
                 var change = data[t + 1].changes[i];
                 if ('Attack' in change) {
                     var attack = change['Attack'];
                     var target = attack.target_unit_id, robot = attack.robot_id;
+                    
+                    // Store positions.
+                    // While we do this we flip the y-axis
+                    // for rendering to the canvas.
+                    var rpos = {
+                        x: unit_locations[robot][0],
+                        y: flipY(unit_locations[robot][1])
+                    };
+                    var tpos = {
+                        x: unit_locations[target][0],
+                        y: flipY(unit_locations[target][1])
+                    };
 
                     ctx.strokeStyle = '#F0F';
                     ctx.lineWidth = 5;
                     ctx.beginPath();
                     ctx.moveTo(
-                        (unit_locations[robot][0] + 0.5) * 500 / w,
-                        (unit_locations[robot][1] + 0.5) * 500 / h);
+                        (rpos.x + 0.5) * 500 / w,
+                        (rpos.y + 0.5) * 500 / h);
                     ctx.lineTo(
-                        (unit_locations[target][0] + 0.5) * 500 / w,
-                        (unit_locations[target][1] + 0.5) * 500 / h);
+                        (tpos.x + 0.5) * 500 / w,
+                        (tpos.y + 0.5) * 500 / h);
                     ctx.stroke();
 
                     ctx.fillStyle = '#F0F';
                     ctx.fillRect(
-                        (unit_locations[target][0] + 0.5) * 500 / w - HEAD_SIZE / 2 * 500 / w,
-                        (unit_locations[target][1] + 0.5) * 500 / h - HEAD_SIZE / 2 * 500 / h,
+                        (tpos.x + 0.5) * 500 / w - HEAD_SIZE / 2 * 500 / w,
+                        (tpos.y + 0.5) * 500 / h - HEAD_SIZE / 2 * 500 / h,
                         HEAD_SIZE * 500 / w,
                         HEAD_SIZE * 500 / h
                     );
-
+                    
+                    // Render splash damage from mages
                     if (unit_types[robot] == 'Mage') {
                         for (var dx = -1; dx <= 1; dx += 1) {
                             for (var dy = -1; dy <= 1; dy += 1) {
@@ -372,11 +398,11 @@ function visualize(data) {
                                 ctx.lineWidth = 5;
                                 ctx.beginPath();
                                 ctx.moveTo(
-                                    (unit_locations[target][0] + 0.5) * 500 / w,
-                                    (unit_locations[target][1] + 0.5) * 500 / h);
+                                    (tpos.x + 0.5) * 500 / w,
+                                    (tpos.y + 0.5) * 500 / h);
                                 ctx.lineTo(
-                                    (unit_locations[target][0] + 0.5 + dx) * 500 / w,
-                                    (unit_locations[target][1] + 0.5 + dy) * 500 / h);
+                                    (tpos.x + 0.5 + dx) * 500 / w,
+                                    (tpos.y + 0.5 + dy) * 500 / h);
                                 ctx.stroke();
                             }
                         }
@@ -404,7 +430,7 @@ function visualize(data) {
         }
     }
     
-    // A bunch of slider event handlers
+    // A bunch of slider + button event handlers
     if (needs_clear) {
         document.getElementById('turnslider').removeEventListener('input', input_listener);
         document.getElementById('turnslider').removeEventListener('mousedown', mousedown_listener);
@@ -435,6 +461,11 @@ function visualize(data) {
         if (paused) this.innerText = 'Resume';
         else this.innerText = 'Pause';
     })
+    
+    // We're about to render, so let's
+    // force unpause.
+    paused = false;
+    document.getElementById('pause').innerText = 'Pause';
     
     render(0);
 }

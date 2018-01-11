@@ -27,8 +27,8 @@ Contributing
 This viewer is not very good and needs improvement. Fork this repository and make pull requests and I will merge them when I'm paying attention. General things that need to be done:
  - Make sure we're not making off-by-one-turn errors with when things should be rendered
  - Visualize Mars at all
- - Distinguish between different types of units
- - Visualize health bars on units
- - Make visualizations for attacks that make clear who is attacking whom
+ - Distinguish between different types of units (done except for rockets)
+ - Visualize health bars on units (done)
+ - Make visualizations for attacks that make clear who is attacking whom (done except for healers, javelin, snipe)
  - Show how many of each kind of unit each player has
- - Implement a scrubber
+ - Implement a scrubber (done)

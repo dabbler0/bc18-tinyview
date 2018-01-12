@@ -270,6 +270,13 @@ function visualize(data) {
         // Render units
         var unit_locations = {};
         var unit_types = {};
+        if (t > 0) {
+            for (var i = 0; i < data[t - 1].units.length; i += 1) {
+                var unit = data[t - 1].units[i];
+                if (unit.location.planet = 'Earth')
+                    unit_locations[unit.id] = [unit.location.x, unit.location.y];
+            }
+        }
         for (var i = 0; i < data[t].units.length; i += 1) {
             var unit = data[t].units[i];
             if (unit.location.planet = 'Earth') {
@@ -352,59 +359,58 @@ function visualize(data) {
         // Render attacks
         // (these are technically made the next turn,
         //  but are rendered this turn for ease of viewing)
-        if (t + 1 < data.length) {
-            for (var i = 0; i < data[t + 1].changes.length; i += 1) {
-                var change = data[t + 1].changes[i];
-                if ('Attack' in change) {
-                    var attack = change['Attack'];
-                    var target = attack.target_unit_id, robot = attack.robot_id;
-                    
-                    // Store positions.
-                    // While we do this we flip the y-axis
-                    // for rendering to the canvas.
-                    var rpos = {
-                        x: unit_locations[robot][0],
-                        y: flipY(unit_locations[robot][1])
-                    };
-                    var tpos = {
-                        x: unit_locations[target][0],
-                        y: flipY(unit_locations[target][1])
-                    };
+        for (var i = 0; i < data[t].changes.length; i += 1) {
+            var change = data[t].changes[i];
+            if ('Attack' in change) {
+                var attack = change['Attack'];
+                var target = attack.target_unit_id, robot = attack.robot_id;
+                
+                // Store positions.
+                // While we do this we flip the y-axis
+                // for rendering to the canvas.
+                var rpos = {
+                    x: unit_locations[robot][0],
+                    y: flipY(unit_locations[robot][1])
+                };
 
-                    ctx.strokeStyle = '#F0F';
-                    ctx.lineWidth = 5;
-                    ctx.beginPath();
-                    ctx.moveTo(
-                        (rpos.x + 0.5) * 500 / w,
-                        (rpos.y + 0.5) * 500 / h);
-                    ctx.lineTo(
-                        (tpos.x + 0.5) * 500 / w,
-                        (tpos.y + 0.5) * 500 / h);
-                    ctx.stroke();
+                var tpos = {
+                    x: unit_locations[target][0],
+                    y: flipY(unit_locations[target][1])
+                };
 
-                    ctx.fillStyle = '#F0F';
-                    ctx.fillRect(
-                        (tpos.x + 0.5) * 500 / w - HEAD_SIZE / 2 * 500 / w,
-                        (tpos.y + 0.5) * 500 / h - HEAD_SIZE / 2 * 500 / h,
-                        HEAD_SIZE * 500 / w,
-                        HEAD_SIZE * 500 / h
-                    );
-                    
-                    // Render splash damage from mages
-                    if (unit_types[robot] == 'Mage') {
-                        for (var dx = -1; dx <= 1; dx += 1) {
-                            for (var dy = -1; dy <= 1; dy += 1) {
-                                ctx.strokeStyle = '#F0F';
-                                ctx.lineWidth = 5;
-                                ctx.beginPath();
-                                ctx.moveTo(
-                                    (tpos.x + 0.5) * 500 / w,
-                                    (tpos.y + 0.5) * 500 / h);
-                                ctx.lineTo(
-                                    (tpos.x + 0.5 + dx) * 500 / w,
-                                    (tpos.y + 0.5 + dy) * 500 / h);
-                                ctx.stroke();
-                            }
+                ctx.strokeStyle = '#F0F';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(
+                    (rpos.x + 0.5) * 500 / w,
+                    (rpos.y + 0.5) * 500 / h);
+                ctx.lineTo(
+                    (tpos.x + 0.5) * 500 / w,
+                    (tpos.y + 0.5) * 500 / h);
+                ctx.stroke();
+
+                ctx.fillStyle = '#F0F';
+                ctx.fillRect(
+                    (tpos.x + 0.5) * 500 / w - HEAD_SIZE / 2 * 500 / w,
+                    (tpos.y + 0.5) * 500 / h - HEAD_SIZE / 2 * 500 / h,
+                    HEAD_SIZE * 500 / w,
+                    HEAD_SIZE * 500 / h
+                );
+                
+                // Render splash damage from mages
+                if (unit_types[robot] == 'Mage') {
+                    for (var dx = -1; dx <= 1; dx += 1) {
+                        for (var dy = -1; dy <= 1; dy += 1) {
+                            ctx.strokeStyle = '#F0F';
+                            ctx.lineWidth = 5;
+                            ctx.beginPath();
+                            ctx.moveTo(
+                                (tpos.x + 0.5) * 500 / w,
+                                (tpos.y + 0.5) * 500 / h);
+                            ctx.lineTo(
+                                (tpos.x + 0.5 + dx) * 500 / w,
+                                (tpos.y + 0.5 + dy) * 500 / h);
+                            ctx.stroke();
                         }
                     }
                 }

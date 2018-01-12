@@ -78,7 +78,8 @@ General TODOs:
         <tr><th>Turn #</th><th>Red Karbonite</th><th>Blue Karbonite</th></tr>
         <tr><td><span id="turn"></span></td><td><span id="red"></span></td><td><span id="blue"></span></td></tr>
     </table>
-    <div><canvas id="main" width=500 height=500 style="border: 1px solid #000"></canvas></div>
+    <div><canvas id="earth" width=500 height=500 style="border: 1px solid #000"></canvas>
+    <canvas id="mars" width=500 height=500 style="border: 1px solid #000"></canvas></div>
     <h2 id="winner"></h2>
 
 <script>
@@ -88,8 +89,10 @@ var HEAD_SIZE = 0.3;
 var MAX_HEALTHS = {'Worker': 100, 'Knight': 250, 'Factory': 300, 'Ranger': 200, 'Mage': 80};
 
 var BORDER_WIDTH = 0.2;
-var canvas = document.getElementById('main');
-var ctx = canvas.getContext('2d');
+var earth_canvas = document.getElementById('earth');
+var earth_ctx = earth_canvas.getContext('2d');
+var mars_canvas = document.getElementById('mars');
+var mars_ctx = mars_canvas.getContext('2d');
 
 var timeout = 10;
 var winner;
@@ -117,7 +120,6 @@ function visualize(data) {
     var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
     var id2team = {};
     var maturation_times = {};
-    var earth_map, mars_map;
     var reserves = [[100, 100]]; // Precomped for every turn
 
     if (current_anim_timeout != null) {
@@ -146,14 +148,20 @@ function visualize(data) {
     document.getElementById('winner').innerText = '';
 
     // Get impassable squares for Earth
-    earth_map = data[0].world.planet_maps.Earth.is_passable_terrain;
+    var planet_maps = {
+        'Earth': data[0].world.planet_maps.Earth.is_passable_terrain,
+        'Mars': data[0].world.planet_maps.Mars.is_passable_terrain
+    };
     
     // Get Karbonite data
     // We'll precomp this for every turn
-    karbonite_maps = [data[0].world.planet_maps.Earth.initial_karbonite];
+    var karbonite_maps = {
+        'Earth': [data[0].world.planet_maps.Earth.initial_karbonite],
+        'Mars': [planet_maps['Mars'].map(function(x) { return x.map(function() { return 0; }); })]
+    };
 
     // Convenience dimension variables
-    var w = earth_map[0].length, h = earth_map.length;
+    var w = planet_maps['Earth'][0].length, h = planet_maps['Earth'].length;
 
     // Get the team identities of the initial units
     // (these are not given ever again so we need to remember)
@@ -179,52 +187,56 @@ function visualize(data) {
         // for a turn instead, swap the two lines below.
         reserves[reserves.length - 1][t % 2] = data[t].karbonite;
         reserves.push(reserves[reserves.length - 1].slice(0));
-        
-        // If Karbonite on the board has changed, update our current counts
-        // TODO:
-        // This currently will result in updating counts
-        // _after_ being displayed for a turn.
-        // If this should occur _before_ being displayed
-        // for a turn instead, put the push after the for loop.
-        // TODO: handle mars updates here
-        karbonite_maps.push(karbonite_maps[karbonite_maps.length - 1].map(function(x) { return x.slice(0); }));
-        for (var i = 0; i < data[t].additional_changes.length; i += 1) {
-            var change = data[t].additional_changes[i];
-            if (change.KarboniteChanged != null && change.KarboniteChanged.location.planet === 'Earth') {
-                karbonite_maps[
-                    karbonite_maps.length - 1
-                ][
-                    change.KarboniteChanged.location.y
-                ][
-                    change.KarboniteChanged.location.x
-                ] = change.KarboniteChanged.new_amount;
-            }
-        }
-        
-        // Precomp units
-        for (var i = 0; i < data[t].units.length; i += 1) {
-            var unit = data[t].units[i];
-            if (unit.location.planet = 'Earth') {
-                // If this unit has never been seen before, it must
-                // have just been made. Thus it belongs to the current player.
-                if (!(unit.id in id2team)) {
-                    id2team[unit.id] = TEAMS[t % 2];
 
-                    // Factories, before they reach full health,
-                    // are actually just blueprints
-                    if (unit.unit_type == 'Factory' || unit.unit_type == 'Rocket') {
-                        maturation_times[unit.id] = Infinity;
+        function update_for(planet) {
+            // If Karbonite on the board has changed, update our current counts
+            karbonite_maps[planet].push(
+                karbonite_maps[planet][karbonite_maps[planet].length - 1].map(function(x) {
+                    return x.slice(0);
+                })
+            );
+            for (var i = 0; i < data[t].additional_changes.length; i += 1) {
+                var change = data[t].additional_changes[i];
+                if (change.KarboniteChanged != null && 
+                        change.KarboniteChanged.location.planet === planet) {
+                    karbonite_maps[planet][
+                        karbonite_maps[planet].length - 1
+                    ][
+                        change.KarboniteChanged.location.y
+                    ][
+                        change.KarboniteChanged.location.x
+                    ] = change.KarboniteChanged.new_amount;
+                }
+            }
+        
+            // Precomp units
+            for (var i = 0; i < data[t].units.length; i += 1) {
+                var unit = data[t].units[i];
+                if (unit.location.planet == planet) {
+                    // If this unit has never been seen before, it must
+                    // have just been made. Thus it belongs to the current player.
+                    if (!(unit.id in id2team)) {
+                        id2team[unit.id] = TEAMS[t % 2];
+
+                        // Factories, before they reach full health,
+                        // are actually just blueprints
+                        if (unit.unit_type == 'Factory' || unit.unit_type == 'Rocket') {
+                            maturation_times[unit.id] = Infinity;
+                        }
+                    }
+
+                    // Factories and rockets mature when they reach full health
+                    if ((unit.unit_type == 'Factory' && unit.health == 300 ||
+                            unit.unit_type == 'Rocket' && unit.health == 200) &&
+                            maturation_times[unit.id] == Infinity) {
+                        maturation_times[unit.id] = t;
                     }
                 }
-
-                // Factories and rockets mature when they reach full health
-                if ((unit.unit_type == 'Factory' && unit.health == 300 ||
-                        unit.unit_type == 'Rocket' && unit.health == 200) &&
-                        maturation_times[unit.id] == Infinity) {
-                    maturation_times[unit.id] = t;
-                }
             }
         }
+
+        update_for('Earth');
+        update_for('Mars');
     }
     
     // set the maximum turn we could slide to
@@ -235,7 +247,7 @@ function visualize(data) {
     function flipY(oy) { return (h - oy - 1); }
 
     // Now, to render an animation frame:
-    function render(t) {
+    function render_planet(t, planet, ctx, canvas) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Draw the map
@@ -245,7 +257,7 @@ function visualize(data) {
                 var px = j, py = flipY(i);
                 
                 // Black out impassable squares
-                if (!earth_map[i][j]) {
+                if (!planet_maps[planet][i][j]) {
                     ctx.fillStyle = '#000'
                         ctx.fillRect(px * (500 / w), py * (500 / h),
                                 500 / w, 500 / h);
@@ -253,19 +265,10 @@ function visualize(data) {
 
                 // Write amount of Karbonite at location
                 ctx.fillStyle = '#888';
-                ctx.fillText(karbonite_maps[t][i][j].toString(),
+                ctx.fillText(karbonite_maps[planet][t][i][j].toString(),
                         (px + 0.5) * (500 / w), (py + 0.5) * 500 / h);
             }
         }
-
-        // This sets the value of the slider to the current turn.
-        // Note: Turn number should be 1-indexed when displayed.
-        document.getElementById('turnslider').value = (t - t % 4) / 4 + 1;
-        
-        // Render Karbonite reserves and turn number
-        document.getElementById('turn').innerText = document.getElementById('turnslider').value.toString();
-        document.getElementById('blue').innerText = reserves[t][0].toString();
-        document.getElementById('red').innerText = reserves[t][1].toString();
 
         // Render units
         var unit_locations = {};
@@ -273,16 +276,17 @@ function visualize(data) {
         if (t > 0) {
             for (var i = 0; i < data[t - 1].units.length; i += 1) {
                 var unit = data[t - 1].units[i];
-                if (unit.location.planet = 'Earth')
-                    unit_locations[unit.id] = [unit.location.x, unit.location.y];
+                unit_locations[unit.id] = [unit.location.x, unit.location.y, unit.location.planet];
             }
         }
         for (var i = 0; i < data[t].units.length; i += 1) {
             var unit = data[t].units[i];
-            if (unit.location.planet = 'Earth') {
+
+            unit_locations[unit.id] = [unit.location.x, unit.location.y, unit.location.planet];
+            unit_types[unit.id] = unit.unit_type;
+
+            if (unit.location.planet == planet) {
                 // Render the unit in the correct color.
-                unit_locations[unit.id] = [unit.location.x, unit.location.y];
-                unit_types[unit.id] = unit.unit_type;
 
                 // Blueprints will be given an alpha
                 if ((unit.unit_type === "Factory" || unit.unit_type === "Rocket") &&
@@ -364,6 +368,9 @@ function visualize(data) {
             if ('Attack' in change) {
                 var attack = change['Attack'];
                 var target = attack.target_unit_id, robot = attack.robot_id;
+
+                if (unit_locations[target][2] != planet || unit_locations[robot][2] != planet)
+                    continue;
                 
                 // Store positions.
                 // While we do this we flip the y-axis
@@ -416,6 +423,20 @@ function visualize(data) {
                 }
             }
         }
+    }
+
+    function render(t) {
+        render_planet(t, 'Earth', earth_ctx, earth_canvas);
+        render_planet(t, 'Mars', mars_ctx, mars_canvas);
+
+        // This sets the value of the slider to the current turn.
+        // Note: Turn number should be 1-indexed when displayed.
+        document.getElementById('turnslider').value = (t - t % 4) / 4 + 1;
+        
+        // Render Karbonite reserves and turn number
+        document.getElementById('turn').innerText = document.getElementById('turnslider').value.toString();
+        document.getElementById('blue').innerText = reserves[t][0].toString();
+        document.getElementById('red').innerText = reserves[t][1].toString();
 
         // Schedule next animation frame
         if (t + 1 < data.length) {

@@ -137,9 +137,13 @@ function visualize(data) {
 
     // Determine who won
     winner = data['metadata'].winner;
-    // TODO Check if this is correct, it might be the other way round
-    if (winner == 'player1') winner = 'Blue';
-    else winner = 'Red';
+    if (winner == 'player1') {
+        winner = data['metadata'].player1;
+        winner_color = 'Red';
+    } else {
+        winner = data['metadata'].player2;
+        winner_color = 'Blue';
+    }
     
     // Parse each turn from the replay file
     data = data['message'].map(JSON.parse);
@@ -452,8 +456,8 @@ function visualize(data) {
             document.getElementById('winner').innerText = '';
         } else {
             // It's the end
-            document.getElementById('winner').innerText = winner + ' wins!';
-            document.getElementById('winner').style.color = TEAM_COLOR[winner];
+            document.getElementById('winner').innerText = winner_color + ' wins! (' + winner + ')';
+            document.getElementById('winner').style.color = TEAM_COLOR[winner_color];
         }
     }
     

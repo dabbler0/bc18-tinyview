@@ -8,7 +8,7 @@ General TODOs:
     - Distinguish between different types of units (started)
     - Visualize health bars on units (done)
     - Make visualizations for attacks that make clear who is attacking whom (done)
-    - Show how many of each kind of unit each player has
+    - Show how many of each kind of unit each player has (done)
     - Implement a scrubber (mostly done)
 -->
 
@@ -54,6 +54,28 @@ General TODOs:
         margin-left: auto;
         margin-right: auto;
     }
+
+    .viewer {
+        float: center;
+    }
+
+    .maps {
+        display: inline-block;
+        float: left;
+    }
+
+    .info {
+        display: inline-block;
+        font-weight: bold;
+        min-width: 110px;
+        float: left;
+        padding: 10px;
+        text-align: left;
+    }
+
+    .property {
+        text-align: left;
+    }
     
     /* make table a bit more readable */
     th, td { padding: 0px 20px; }
@@ -73,22 +95,35 @@ General TODOs:
         <input id="turnslider" type="range" min="1"/>
         <button id="pause">Pause</button>
     </div>
-    <br/>
-    <table>
-        <tr><th>Turn #</th><th>Red Karbonite</th><th>Blue Karbonite</th></tr>
-        <tr><td><span id="turn"></span></td><td><span id="red"></span></td><td><span id="blue"></span></td></tr>
-    </table>
-    <div><canvas id="earth" width=500 height=500 style="border: 1px solid #000"></canvas>
-    <canvas id="mars" width=500 height=500 style="border: 1px solid #000"></canvas></div>
     <h2 id="winner"></h2>
+    <div class="viewer">
+        <div class="info">
+            <h3 style="text-align:center;">Turn: #<span id="turn"></span></h3>
+            <div id="infoRed" class="info">
+                <h3 style="text-align:center; color:#F00">Red</h3>
+                <p class="property">Karbonite: <span id="red_karbonite"></span></p>
+            </div>
+            <div id="infoBlue" class="info">
+                <h3 style="text-align:center; color:#00F">Blue</h3>
+                <p class="property">Karbonite: <span id="blue_karbonite"></span></p>
+            </div>
+        </div>
+        <div class="maps">
+            <canvas id="earth" width=500 height=500 style="border: 1px solid #000"></canvas>
+            <canvas id="mars" width=500 height=500 style="border: 1px solid #000"></canvas>
+        </div>
+    </div>
 
 <script>
 
-var mousedown_listener, mouseup_listener, input_listener, needs_clear = false;
-var HEAD_SIZE = 0.3;
+var UNIT_CLASSES = ['Worker', 'Knight', 'Factory', 'Ranger', 'Mage', 'Healer'];
 var MAX_HEALTHS = {'Worker': 100, 'Knight': 250, 'Factory': 300, 'Ranger': 200, 'Mage': 80, 'Healer': 100};
-
+var TEAMS = ['Red', 'Blue'];
+var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
+var HEAD_SIZE = 0.3;
 var BORDER_WIDTH = 0.2;
+
+var mousedown_listener, mouseup_listener, input_listener, needs_clear = false;
 var earth_canvas = document.getElementById('earth');
 var earth_ctx = earth_canvas.getContext('2d');
 var mars_canvas = document.getElementById('mars');
@@ -105,6 +140,20 @@ document.getElementById('timeout').addEventListener('change', function(e) {
     timeout = document.getElementById('timeout').value;
 });
 
+for (var i = 0, team; team = TEAMS[i]; i++) {
+    teamInfo = document.getElementById('info' + team);
+    for (var j = 0, unit_class; unit_class = UNIT_CLASSES[j]; j++) {
+        var property = document.createElement('p');
+        property.setAttribute('class', 'property')
+        property.innerText = unit_class + ': ';
+
+        var field = document.createElement('span');
+        field.setAttribute('id', 'info' + team + unit_class);
+        property.appendChild(field);
+        teamInfo.appendChild(property);
+    }
+}
+
 /*
 Visualize a replay file given a JSON object
 corresponding to the file.
@@ -116,8 +165,6 @@ var current_anim_timeout = null;
 
 function visualize(data) {
     // Globals
-    var TEAMS = ['Red', 'Blue'];
-    var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
     var id2team = {};
     var maturation_times = {};
     var reserves = [[100, 100]]; // Precomped for every turn
@@ -251,7 +298,7 @@ function visualize(data) {
     function flipY(oy) { return (h - oy - 1); }
 
     // Now, to render an animation frame:
-    function render_planet(t, planet, ctx, canvas) {
+    function render_planet(t, planet, ctx, canvas, unit_count) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Draw the map
@@ -290,6 +337,8 @@ function visualize(data) {
             unit_types[unit.id] = unit.unit_type;
 
             if (unit.location.planet == planet) {
+                unit_count[id2team[unit.id]][unit.unit_type]++;
+
                 // Render the unit in the correct color.
 
                 // Blueprints will be given an alpha
@@ -430,8 +479,20 @@ function visualize(data) {
     }
 
     function render(t) {
-        render_planet(t, 'Earth', earth_ctx, earth_canvas);
-        render_planet(t, 'Mars', mars_ctx, mars_canvas);
+        var earth_unit_count = {};
+        var mars_unit_count = {};
+
+        for (var i = 0, team; team = TEAMS[i]; i++) {
+            earth_unit_count[team] = {};
+            mars_unit_count[team] = {};
+            for (var j = 0, unit_class; unit_class = UNIT_CLASSES[j]; j++) {
+                earth_unit_count[team][unit_class] = 0;
+                mars_unit_count[team][unit_class] = 0;
+            }
+        }
+
+        render_planet(t, 'Earth', earth_ctx, earth_canvas, earth_unit_count);
+        render_planet(t, 'Mars', mars_ctx, mars_canvas, mars_unit_count);
 
         // This sets the value of the slider to the current turn.
         // Note: Turn number should be 1-indexed when displayed.
@@ -439,8 +500,15 @@ function visualize(data) {
         
         // Render Karbonite reserves and turn number
         document.getElementById('turn').innerText = document.getElementById('turnslider').value.toString();
-        document.getElementById('blue').innerText = reserves[t][0].toString();
-        document.getElementById('red').innerText = reserves[t][1].toString();
+        document.getElementById('blue_karbonite').innerText = reserves[t][0].toString();
+        document.getElementById('red_karbonite').innerText = reserves[t][1].toString();
+
+        for (var i = 0, team; team = TEAMS[i]; i++) {
+            for (var j = 0, unit_class; unit_class = UNIT_CLASSES[j]; j++) {
+                document.getElementById('info' + team + unit_class)
+                    .innerText = earth_unit_count[team][unit_class] + ' // ' + mars_unit_count[team][unit_class];
+            }
+        }
 
         // Schedule next animation frame
         if (t + 1 < data.length) {
@@ -510,7 +578,6 @@ document.getElementById('fname').addEventListener('keydown', function(e) {
         var q = new XMLHttpRequest();
         q.open('GET', path, true);
         document.getElementById('loading').innerText = 'Loading...';
-
         // Replay file arrives -- callback:
         q.onreadystatechange = function() {
             if (q.readyState == XMLHttpRequest.DONE) {

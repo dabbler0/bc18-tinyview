@@ -32,5 +32,5 @@ This viewer is not very good and needs improvement. Fork this repository and mak
  - Distinguish between different types of units (done except for rockets)
  - Visualize health bars on units (done)
  - Make visualizations for attacks that make clear who is attacking whom (done except for healers, javelin, snipe)
- - Show how many of each kind of unit each player has
+ - Show how many of each kind of unit each player has (done)
  - Implement a scrubber (done)

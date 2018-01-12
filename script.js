@@ -1,27 +1,28 @@
-var UNIT_CLASSES = ['Worker', 'Knight', 'Factory', 'Ranger', 'Mage', 'Healer'];
-var MAX_HEALTHS = {'Worker': 100, 'Knight': 250, 'Factory': 300, 'Ranger': 200, 'Mage': 80, 'Healer': 100};
+// Constants
+var UNIT_CLASSES = ['Worker', 'Knight', 'Ranger', 'Mage', 'Healer', 'Factory'];
+var MAX_HEALTHS = {'Worker': 100, 'Knight': 250, 'Ranger': 200, 'Mage': 80, 'Healer': 100, 'Factory': 300};
 var TEAMS = ['Red', 'Blue'];
 var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
 var HEAD_SIZE = 0.3;
 var BORDER_WIDTH = 0.2;
 
-var mousedown_listener, mouseup_listener, input_listener, needs_clear = false;
+// Globals
+var mousedown_listener, mouseup_listener, input_listener;
 var earth_canvas = document.getElementById('earth');
 var earth_ctx = earth_canvas.getContext('2d');
 var mars_canvas = document.getElementById('mars');
 var mars_ctx = mars_canvas.getContext('2d');
-
 var timeout = 10;
-var winner;
+
+// Set default timeout value
 document.getElementById('timeout').value = timeout;
 
-/*
-Allow setting replay speed
-*/
+// Allow setting replay speed
 document.getElementById('timeout').addEventListener('change', function(e) {
     timeout = document.getElementById('timeout').value;
 });
 
+// Create tags for representing each team's unit count
 for (var i = 0, team; team = TEAMS[i]; i++) {
     teamInfo = document.getElementById('info' + team);
     for (var j = 0, unit_class; unit_class = UNIT_CLASSES[j]; j++) {
@@ -47,6 +48,8 @@ var current_anim_timeout = null;
 
 function visualize(data) {
     // Globals
+    var winner;
+    var team_name = {}
     var id2team = {};
     var maturation_times = {};
     var reserves = [[100, 100]]; // Precomped for every turn
@@ -54,29 +57,31 @@ function visualize(data) {
     if (current_anim_timeout != null) {
         clearTimeout(current_anim_timeout);
     }
-    
+
     // Whether or not the slider is currently being held down.
     // This is used because the input event only fires
     // when the slider's value is actively changing,
     // but we want it to pause even if it is held in position.
     var slider_held = false;
-    
+
     // Whether or not we're currently paused.
     var paused = false;
 
+    // Whether we should restart the replay
+    var reset = false;
+
+    // Store team names
+    team_name['Red'] = data['metadata'].player1;
+    team_name['Blue'] = data['metadata'].player2;
+
     // Determine who won
     winner = data['metadata'].winner;
-    if (winner == 'player1') {
-        winner = data['metadata'].player1;
-        winner_color = 'Red';
-    } else {
-        winner = data['metadata'].player2;
-        winner_color = 'Blue';
-    }
-    
+    if (winner == 'player1') winner = 'Red';
+    else winner = 'Blue';
+
     // Parse each turn from the replay file
     data = data['message'].map(JSON.parse);
-    
+
     // Clear info on the winner
     document.getElementById('winner').innerText = '';
 
@@ -85,7 +90,7 @@ function visualize(data) {
         'Earth': data[0].world.planet_maps.Earth.is_passable_terrain,
         'Mars': data[0].world.planet_maps.Mars.is_passable_terrain
     };
-    
+
     // Get Karbonite data
     // We'll precomp this for every turn
     var karbonite_maps = {
@@ -107,7 +112,7 @@ function visualize(data) {
     // Pop off the first "turn", whic is not a turn
     // but instead an initialization object
     data.shift();
-    
+
     // We will now precomp Karbonite data,
     // reserves data, and unit teams, to allow
     // scrubbing.
@@ -130,7 +135,7 @@ function visualize(data) {
             );
             for (var i = 0; i < data[t].additional_changes.length; i += 1) {
                 var change = data[t].additional_changes[i];
-                if (change.KarboniteChanged != null && 
+                if (change.KarboniteChanged != null &&
                         change.KarboniteChanged.location.planet === planet) {
                     karbonite_maps[planet][
                         karbonite_maps[planet].length - 1
@@ -141,7 +146,7 @@ function visualize(data) {
                     ] = change.KarboniteChanged.new_amount;
                 }
             }
-        
+
             // Precomp units
             for (var i = 0; i < data[t].units.length; i += 1) {
                 var unit = data[t].units[i];
@@ -171,11 +176,11 @@ function visualize(data) {
         update_for('Earth');
         update_for('Mars');
     }
-    
+
     // set the maximum turn we could slide to
     var t = data.length - 1;
     document.getElementById('turnslider').max = (t - t % 4) / 4 + 1;
-    
+
     // This is used to invert the y-axis
     function flipY(oy) { return (h - oy - 1); }
 
@@ -188,7 +193,7 @@ function visualize(data) {
             for (var j = 0; j < w; j += 1) {
                 // Flip along y-axis
                 var px = j, py = flipY(i);
-                
+
                 // Black out impassable squares
                 if (!planet_maps[planet][i][j]) {
                     ctx.fillStyle = '#000'
@@ -199,7 +204,7 @@ function visualize(data) {
                 // Write amount of Karbonite at location
                 ctx.fillStyle = '#888';
                 ctx.fillText(karbonite_maps[planet][t][i][j].toString(),
-                        (px + 0.5) * (500 / w), (py + 0.5) * 500 / h);
+                        (px + 0.4) * (500 / w), (py + 0.6) * 500 / h);
             }
         }
 
@@ -219,6 +224,7 @@ function visualize(data) {
             unit_types[unit.id] = unit.unit_type;
 
             if (unit.location.planet == planet) {
+                // Increment unit_count for the scoreboard
                 unit_count[id2team[unit.id]][unit.unit_type]++;
 
                 // Render the unit in the correct color.
@@ -229,38 +235,31 @@ function visualize(data) {
                     ctx.globalAlpha = 0.5;
                 }
 
-                // The border of the square will represent the
-                // unit type.
-                if (unit.unit_type === "Worker") {
-                    // Workers will be yellow, because whatever.
-                    ctx.fillStyle = '#FF0';
-                }
-                
-                else if (unit.unit_type === "Factory") {
-                    // Factories will be gray
-                    ctx.fillStyle = '#888';
-                }
-
-                else if (unit.unit_type == "Knight") {
-                    // Knights will be some kind of maroon
-                    ctx.fillStyle = '#800';
-                }
-
-                else if (unit.unit_type == "Ranger") {
-                    // Rangers will be some kind of dark green
-                    ctx.fillStyle = '#080';
-                }
-
-                else if (unit.unit_type == "Mage") {
-                    // Rangers will be some kind of dark blue
-                    ctx.fillStyle = '#008';
+                // The border of the square will represent the unit type.
+                switch (unit.unit_type) {
+                    case "Worker":
+                        // Workers will be yellow, because whatever.
+                        ctx.fillStyle = '#FF0'; break;
+                    case "Knight":
+                        // Knights will be some kind of maroon
+                        ctx.fillStyle = '#800'; break;
+                    case "Ranger":
+                        // Rangers will be some kind of dark green
+                        ctx.fillStyle = '#080'; break;
+                    case "Mage":
+                        // Rangers will be some kind of dark blue
+                        ctx.fillStyle = '#008'; break;
+                    case "Healer":
+                        // Healers will be some kind of purple
+                        ctx.fillStyle = '#808'; break;
+                    case "Factory":
+                        // Factories will be gray
+                        ctx.fillStyle = '#888'; break;
+                    default:
+                        // Unimplemented unit type
+                        ctx.fillStyle = '#FFF';
                 }
 
-                else {
-                    // Unimplemented unit type
-                    ctx.fillStyle = '#FFF';
-                }
-                
                 // Flip along the y-axis for drawing.
                 // This is because canvas is top-left based.
                 var px = unit.location.x;
@@ -306,7 +305,7 @@ function visualize(data) {
 
                 if (unit_locations[target][2] != planet || unit_locations[robot][2] != planet)
                     continue;
-                
+
                 // Store positions.
                 // While we do this we flip the y-axis
                 // for rendering to the canvas.
@@ -338,7 +337,7 @@ function visualize(data) {
                     HEAD_SIZE * 500 / w,
                     HEAD_SIZE * 500 / h
                 );
-                
+
                 // Render splash damage from mages
                 if (unit_types[robot] == 'Mage') {
                     for (var dx = -1; dx <= 1; dx += 1) {
@@ -379,12 +378,13 @@ function visualize(data) {
         // This sets the value of the slider to the current turn.
         // Note: Turn number should be 1-indexed when displayed.
         document.getElementById('turnslider').value = (t - t % 4) / 4 + 1;
-        
+
         // Render Karbonite reserves and turn number
         document.getElementById('turn').innerText = document.getElementById('turnslider').value.toString();
         document.getElementById('blue_karbonite').innerText = reserves[t][0].toString();
         document.getElementById('red_karbonite').innerText = reserves[t][1].toString();
 
+        // Render unit count for each team
         for (var i = 0, team; team = TEAMS[i]; i++) {
             for (var j = 0, unit_class; unit_class = UNIT_CLASSES[j]; j++) {
                 document.getElementById('info' + team + unit_class)
@@ -393,61 +393,65 @@ function visualize(data) {
         }
 
         // Schedule next animation frame
-        if (t + 1 < data.length) {
+        if (slider_held || paused || reset || t + 1 < data.length) {
             var new_t = t + 1;
-            if (slider_held || paused) {
+            if (reset) {
+                // We want to restart.
+                reset = false;
+                new_t = 0;
+            } else if (slider_held || paused) {
                 // We want to pause.
                 new_t = t;
             }
-            
+
             current_anim_timeout = setTimeout(function() {
                 render(new_t);
             }, timeout);
             document.getElementById('winner').innerText = '';
         } else {
             // It's the end
-            document.getElementById('winner').innerText = winner_color + ' wins! (' + winner + ')';
-            document.getElementById('winner').style.color = TEAM_COLOR[winner_color];
+            document.getElementById('winner').innerText = winner + ' wins! (' + team_name[winner] + ')';
+            document.getElementById('winner').style.color = TEAM_COLOR[winner];
         }
     }
-    
-    // A bunch of slider + button event handlers
-    if (needs_clear) {
-        document.getElementById('turnslider').removeEventListener('input', input_listener);
-        document.getElementById('turnslider').removeEventListener('mousedown', mousedown_listener);
-        document.getElementById('turnslider').removeEventListener('mouseup', mouseup_listener);
-    }
 
-    needs_clear = true;
+    // A bunch of slider + button event handlers
+    // Remove the ones from the previous visualization
+    document.getElementById('turnslider').removeEventListener('input', input_listener);
+    document.getElementById('turnslider').removeEventListener('mousedown', mousedown_listener);
+    document.getElementById('turnslider').removeEventListener('mouseup', mouseup_listener);
 
     document.getElementById('turnslider').addEventListener('input', input_listener = function(e) {
         // Clear current timeout
         clearTimeout(current_anim_timeout);
-        
+
         // Render the first value of t represented by the given turn
         var t = (this.value - 1) * 4;
         render(t);
     });
-    
+
     document.getElementById('turnslider').addEventListener('mousedown', mousedown_listener = function(e) {
         slider_held = true;
     });
-    
+
     document.getElementById('turnslider').addEventListener('mouseup', mouseup_listener = function(e) {
-        slider_held = false; 
+        slider_held = false;
     });
-    
+
     document.getElementById('pause').addEventListener('click', function(e) {
         paused = !paused;
         if (paused) this.innerText = 'Resume';
         else this.innerText = 'Pause';
     })
-    
-    // We're about to render, so let's
-    // force unpause.
+
+    document.getElementById('reset').addEventListener('click', function(e) {
+        reset = true;
+    })
+
+    // We're about to render, so let's force unpause.
     paused = false;
     document.getElementById('pause').innerText = 'Pause';
-    
+
     render(0);
 }
 
@@ -460,6 +464,7 @@ document.getElementById('fname').addEventListener('keydown', function(e) {
         var q = new XMLHttpRequest();
         q.open('GET', path, true);
         document.getElementById('loading').innerText = 'Loading...';
+
         // Replay file arrives -- callback:
         q.onreadystatechange = function() {
             if (q.readyState == XMLHttpRequest.DONE) {
@@ -476,6 +481,7 @@ document.getElementById('fname').addEventListener('keydown', function(e) {
     }
 });
 
+// Selecting a file triggers replay visualization
 document.getElementById('ffile').addEventListener('change', function(e) {
     var file = this.files[0];
 

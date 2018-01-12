@@ -1,62 +1,56 @@
+/* font includes */
+@import url('https://fonts.googleapis.com/css?family=Inconsolata|Roboto');
+
 h1 {
-        font-family: Inconsolata;
-        font-size: 2.5em;
-        text-align: center;
-    }
-    
-    h2 {
-        font-family: Roboto;
-        font-size: 2em;
-        text-align: center;
-    }
-    
-    /* this also takes care of canvas centering, how convenient */
-    div {
-        font-family: Roboto;
-        font-size: 1em;
-        text-align: center;
-    }
-    
-    button {
-        font-family: Roboto;
-        font-size: 1em;
-    }
-    
-    input {
-        font-family: Inconsolata;
-        font-size: 1em;
-    }
-    
-    /* center the table and set font */
-    table {
-        font-family: Roboto;
-        font-size: 1em;
-        
-        margin-left: auto;
-        margin-right: auto;
-    }
+    font-family: Inconsolata;
+    font-size: 2.5em;
+    text-align: center;
+}
 
-    .viewer {
-        float: center;
-    }
+h2 {
+    font-family: Roboto;
+    font-size: 2em;
+    text-align: center;
+}
 
-    .maps {
-        display: inline-block;
-        float: left;
-    }
+/* this also takes care of canvas centering, how convenient */
+div {
+    font-family: Roboto;
+    font-size: 1em;
+    text-align: center;
+}
 
-    .info {
-        display: inline-block;
-        font-weight: bold;
-        min-width: 110px;
-        float: left;
-        padding: 10px;
-        text-align: left;
-    }
+button {
+    font-family: Roboto;
+    font-size: 1em;
+}
 
-    .property {
-        text-align: left;
-    }
-    
-    /* make table a bit more readable */
-    th, td { padding: 0px 20px; }
+input {
+    font-family: Inconsolata;
+    font-size: 1em;
+}
+
+.viewer {
+    float: center;
+}
+
+.maps {
+    display: inline-block;
+    float: left;
+}
+
+.info {
+    display: inline-block;
+    font-weight: bold;
+    min-width: 110px;
+    float: left;
+    padding: 10px;
+    text-align: left;
+}
+
+.property {
+    text-align: left;
+}
+
+/* make table a bit more readable */
+th, td { padding: 0px 20px; }

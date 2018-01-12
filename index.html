@@ -1,31 +1,19 @@
 <html>
-<!--
-A minimalist viewer for Battlecode 2018 replay files.
-
-General TODOs:
-    - Make sure we're not making off-by-one-turn errors with when things should be rendered
-    - Visualize Mars at all (done, untested)
-    - Distinguish between different types of units (started)
-    - Visualize health bars on units (done)
-    - Make visualizations for attacks that make clear who is attacking whom (done)
-    - Show how many of each kind of unit each player has (done)
-    - Implement a scrubber (mostly done)
--->
-
 <head>
+    <!-- Here's a simple stylesheet to make things look a bit better. -->
     <link rel="stylesheet" href="styles.css">
 </head>
 
-<!-- Here's a simple stylesheet to make things look a bit better. -->
-<style>
-    /* font includes */
-    @import url('https://fonts.googleapis.com/css?family=Inconsolata|Roboto');
-</style>
-    
 <body>
     <h1>bc18-tinyviewer</h1>
-    <div><label for="fname">If you're hosting the website locally:</label> <input id="fname" placeholder="filepath"/></div>
-    <div><label for="ffile">Upload a file:</label> <input id="ffile" type="file"/></div>
+    <div>
+        <label for="fname">If you're hosting the website locally:</label>
+        <input id="fname" placeholder="filepath"/>
+    </div>
+    <div>
+        <label for="ffile">Upload a file:</label>
+        <input id="ffile" type="file"/>
+    </div>
     <div id="loading"></div>
     <div>
         <label for="timeout">Set time delay per turn (ms):</label>
@@ -35,6 +23,7 @@ General TODOs:
         <label for="turnslider">Go to turn #:</label>
         <input id="turnslider" type="range" min="1"/>
         <button id="pause">Pause</button>
+        <button id="reset">Reset</button>
     </div>
     <h2 id="winner"></h2>
     <div class="viewer">

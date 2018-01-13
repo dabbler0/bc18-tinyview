@@ -2,7 +2,7 @@
 var UNIT_CLASSES = ['Worker', 'Knight', 'Ranger', 'Mage', 'Healer', 'Factory'];
 var MAX_HEALTHS = {'Worker': 100, 'Knight': 250, 'Ranger': 200, 'Mage': 80, 'Healer': 100, 'Factory': 300};
 var TEAMS = ['Red', 'Blue'];
-var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
+var TEAM_COLOR = {'Red': '#ac1c1e', 'Blue': '#3273dc'};
 var ATTACK_COLOR = {'Red': 'rgba(255, 0, 0, 0.7)', 'Blue': 'rgba(0, 0, 255, 0.7)'};
 var HEAL_COLOR = {'Red': 'rgba(77, 175, 74, 0.8)', 'Blue': 'rgba(77, 175, 74, 0.8)'};
 var HEAD_SIZE = 0.3;
@@ -245,6 +245,9 @@ function visualize(data) {
     // Now, to render an animation frame:
     function render_planet(t, fractional_t, planet, ctx, canvas, unit_count) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
         let karbonite_at_tick = karbonite_maps[planet][t];
 
         // Draw the map
@@ -254,16 +257,42 @@ function visualize(data) {
                 var px = j, py = flipY(i);
 
                 // Black out impassable squares
-                if (!planet_maps[planet][i][j]) {
-                    ctx.fillStyle = '#000'
-                        ctx.fillRect(px * (500 / w), py * (500 / h),
-                                500 / w, 500 / h);
-                }
+                ctx.beginPath();
+                ctx.rect(px * (500 / w), py * (500 / h), 500 / w, 500 / h);
 
-                // Write amount of Karbonite at location
-                ctx.fillStyle = '#888';
-                ctx.fillText(karbonite_at_tick[i][j].toString(),
-                        (px + 0.4) * (500 / w), (py + 0.6) * 500 / h);
+                if (!planet_maps[planet][i][j]) {
+                    if (planet == 'Mars') {
+                        ctx.fillStyle = '#5d1e10';
+                        ctx.strokeStyle = '#591d0f';
+                    } else {
+                        ctx.fillStyle = '#306796';
+                        ctx.strokeStyle = '#2e6491';
+                    }
+
+                } else {
+                    if (planet == 'Mars') {
+                        ctx.fillStyle = "#e4cdc0";
+                        ctx.strokeStyle = '#c4b0a5';
+                    } else {
+                        ctx.fillStyle = "#FFF";
+                        ctx.strokeStyle = '#e4e4e4';
+                    }
+                }
+                
+                ctx.fill();
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                if (karbonite_at_tick[i][j] > 0) {
+                    // Write amount of Karbonite at location
+                    ctx.globalAlpha = (karbonite_at_tick[i][j] > 0 ? 0.2 : 0.0) + 0.6 * (karbonite_at_tick[i][j] / 50);
+                    ctx.fillStyle = '#337';
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                    // ctx.fillStyle = '#888';
+                    // ctx.fillText(karbonite_at_tick[i][j].toString(),
+                    //         (px + 0.4) * (500 / w), (py + 0.6) * 500 / h);
+                }
             }
         }
 
@@ -291,6 +320,7 @@ function visualize(data) {
 
         for (var i = 0; i < data[t].units.length; i += 1) {
             var unit = data[t].units[i];
+
             var prevUnit = prevUnits[unit.id];
             if (prevUnit === undefined) prevUnit = unit;
 
@@ -330,7 +360,10 @@ function visualize(data) {
                         unitTypeStyle = '#808'; break;
                     case "Factory":
                         // Factories will be gray
-                        unitTypeStyle = '#888'; break;
+                        unitTypeStyle = '#000'; break;
+                    case "Rocket":
+                        // Rockets
+                        unitTypeStyle = '#000'; break;
                     default:
                         // Unimplemented unit type
                         unitTypeStyle = '#FFF';
@@ -352,7 +385,7 @@ function visualize(data) {
                     health = prevUnit.health / MAX_HEALTHS[unit.unit_type];
                 }
 
-                if (unit.unit_type == "Factory" || unit.unit_type == "Rocket") {
+                if (unit.unit_type == "Factory") {
                     // Fill the border
                     ctx.fillStyle = unitTypeStyle;
                     ctx.fillRect(
@@ -380,10 +413,11 @@ function visualize(data) {
                     var cy = (py + 0.5) * 500 / h;
                     var radius = 0.3 * 500 / w;
 
+                    let lineWidthMultiplier = 20 / w;
                     ctx.beginPath();
                     ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
                     ctx.strokeStyle = TEAM_COLOR[id2team[unit.id]];
-                    ctx.lineWidth = 6;
+                    ctx.lineWidth = 6 * lineWidthMultiplier;
                     ctx.stroke();
 
                     if (health < 1) {
@@ -403,6 +437,13 @@ function visualize(data) {
                     // Radial health
                     // ctx.arc(cx, cy, health * radius, 0, 2 * Math.PI);
                     ctx.fill();
+
+                    if (unit.unit_type == "Rocket") {
+                        // Draw how many units are inside
+                        // ctx.fillStyle = '#888';
+                        // ctx.fillText(karbonite_at_tick[i][j].toString(),
+                        //         (px + 0.4) * (500 / w), (py + 0.6) * 500 / h);
+                    }
                 }
 
                 ctx.globalAlpha = 1;

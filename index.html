@@ -29,18 +29,22 @@
     <div class="viewer">
         <div class="info">
             <h3 style="text-align:center;">Turn: #<span id="turn"></span></h3>
-            <div id="infoRed" class="info">
-                <h3 style="text-align:center; color:#F00">Red</h3>
-                <p class="property">Karbonite: <span id="red_karbonite"></span></p>
-            </div>
-            <div id="infoBlue" class="info">
-                <h3 style="text-align:center; color:#00F">Blue</h3>
-                <p class="property">Karbonite: <span id="blue_karbonite"></span></p>
-            </div>
+            <table>
+                <tr><td>Karbonite</td><td class="infoRed" id="red_karbonite"></td><td class="infoBlue" id="blue_karbonite"></td></tr>
+                <tr><td>Workers</td><td class="infoRed" id="infoRedWorker"></td><td class="infoBlue" id="infoBlueWorker"></td></tr>
+                <tr><td>Knights</td><td class="infoRed" id="infoRedKnight"></td><td class="infoBlue" id="infoBlueKnight"></td></tr>
+                <tr><td>Rangers</td><td class="infoRed" id="infoRedRanger"></td><td class="infoBlue" id="infoBlueRanger"></td></tr>
+                <tr><td>Mages</td><td class="infoRed" id="infoRedMage"></td><td class="infoBlue" id="infoBlueMage"> </td></tr>
+                <tr><td>Healers</td><td class="infoRed" id="infoRedHealer"></td><td class="infoBlue" id="infoBlueHealer"></td></tr>
+                <tr><td>Factories</td><td class="infoRed" id="infoRedFactory"></td><td class="infoBlue" id="infoBlueFactory"></td></tr>
+            </table>
         </div>
         <div class="maps">
             <canvas id="earth" width=500 height=500 style="border: 1px solid #000"></canvas>
             <canvas id="mars" width=500 height=500 style="border: 1px solid #000"></canvas>
+        </div>
+        <div class="graphs">
+            <canvas id="graphs" width=1006 height=200 style="border: 1px solid #000"></canvas>
         </div>
     </div>
 

@@ -3,6 +3,8 @@ var UNIT_CLASSES = ['Worker', 'Knight', 'Ranger', 'Mage', 'Healer', 'Factory'];
 var MAX_HEALTHS = {'Worker': 100, 'Knight': 250, 'Ranger': 200, 'Mage': 80, 'Healer': 100, 'Factory': 300};
 var TEAMS = ['Red', 'Blue'];
 var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
+var ATTACK_COLOR = {'Red': 'rgba(255, 0, 0, 0.7)', 'Blue': 'rgba(0, 0, 255, 0.7)'};
+var HEAL_COLOR = {'Red': 'rgba(77, 175, 74, 0.8)', 'Blue': 'rgba(77, 175, 74, 0.8)'};
 var HEAD_SIZE = 0.3;
 var BORDER_WIDTH = 0.2;
 
@@ -12,7 +14,8 @@ var earth_canvas = document.getElementById('earth');
 var earth_ctx = earth_canvas.getContext('2d');
 var mars_canvas = document.getElementById('mars');
 var mars_ctx = mars_canvas.getContext('2d');
-var timeout = 10;
+var timeout = 40;
+var activeID = 0;
 
 // Set default timeout value
 document.getElementById('timeout').value = timeout;
@@ -44,19 +47,39 @@ corresponding to the file.
  which are strings corresponding to JSON objects,
  being parsed.)
 */
-var current_anim_timeout = null;
+
+function lerp(p1, p2, t) {
+    t = Math.min(1, Math.max(0, t));
+    return { x: p2.x*t + p1.x*(1-t), y: p2.y*t + p1.y*(1-t) }
+}
+
+function lerpf(v1, v2, t) {
+    t = Math.min(1, Math.max(0, t));
+    return v2 * t + v1 * (1 - t);
+}
+
+function vectorSub(v1, v2) {
+    return { x: v2.x - v1.x, y: v2.y - v1.y }
+}
+
+function vectorRotate90(v) {
+    return { x: -v.y, y: v.x }
+}
+
+function vectorNormalize(v) {
+    var magn = Math.sqrt(v.x*v.x + v.y*v.y);
+    return { x: v.x/magn, y: v.y/magn }
+}
 
 function visualize(data) {
+    activeID += 1;
+    let currentID = activeID;
     // Globals
     var winner;
     var team_name = {}
     var id2team = {};
     var maturation_times = {};
     var reserves = [[100, 100]]; // Precomped for every turn
-
-    if (current_anim_timeout != null) {
-        clearTimeout(current_anim_timeout);
-    }
 
     // Whether or not the slider is currently being held down.
     // This is used because the input event only fires
@@ -185,8 +208,9 @@ function visualize(data) {
     function flipY(oy) { return (h - oy - 1); }
 
     // Now, to render an animation frame:
-    function render_planet(t, planet, ctx, canvas, unit_count) {
+    function render_planet(t, fractional_t, planet, ctx, canvas, unit_count) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let karbonite_at_tick = karbonite_maps[planet][t];
 
         // Draw the map
         for (var i = 0; i < h; i += 1) {
@@ -203,7 +227,7 @@ function visualize(data) {
 
                 // Write amount of Karbonite at location
                 ctx.fillStyle = '#888';
-                ctx.fillText(karbonite_maps[planet][t][i][j].toString(),
+                ctx.fillText(karbonite_at_tick[i][j].toString(),
                         (px + 0.4) * (500 / w), (py + 0.6) * 500 / h);
             }
         }
@@ -217,10 +241,26 @@ function visualize(data) {
                 unit_locations[unit.id] = [unit.location.x, unit.location.y, unit.location.planet];
             }
         }
+
+        let prevUnits = {}
+        if (t > 0) {
+            for (var i = 0; i < data[t - 1].units.length; i += 1) {
+                var unit = data[t - 1].units[i];
+                prevUnits[unit.id] = unit;
+            }
+        }
+        
+
+        const DamageTime = 0.5;
+        const MoveFinishedTime = 0.8;
+
         for (var i = 0; i < data[t].units.length; i += 1) {
             var unit = data[t].units[i];
+            var prevUnit = prevUnits[unit.id];
+            if (prevUnit === undefined) prevUnit = unit;
 
-            unit_locations[unit.id] = [unit.location.x, unit.location.y, unit.location.planet];
+            let interpLocation = lerp(prevUnit.location, unit.location, fractional_t / MoveFinishedTime);
+            unit_locations[unit.id] = [interpLocation.x, interpLocation.y, unit.location.planet];
             unit_types[unit.id] = unit.unit_type;
 
             if (unit.location.planet == planet) {
@@ -235,60 +275,100 @@ function visualize(data) {
                     ctx.globalAlpha = 0.5;
                 }
 
+                let unitTypeStyle = "";
                 // The border of the square will represent the unit type.
                 switch (unit.unit_type) {
                     case "Worker":
                         // Workers will be yellow, because whatever.
-                        ctx.fillStyle = '#FF0'; break;
+                        unitTypeStyle = '#FF0'; break;
                     case "Knight":
                         // Knights will be some kind of maroon
-                        ctx.fillStyle = '#800'; break;
+                        unitTypeStyle = '#800'; break;
                     case "Ranger":
                         // Rangers will be some kind of dark green
-                        ctx.fillStyle = '#080'; break;
+                        unitTypeStyle = '#080'; break;
                     case "Mage":
                         // Rangers will be some kind of dark blue
-                        ctx.fillStyle = '#008'; break;
+                        unitTypeStyle = '#008'; break;
                     case "Healer":
                         // Healers will be some kind of purple
-                        ctx.fillStyle = '#808'; break;
+                        unitTypeStyle = '#808'; break;
                     case "Factory":
                         // Factories will be gray
-                        ctx.fillStyle = '#888'; break;
+                        unitTypeStyle = '#888'; break;
                     default:
                         // Unimplemented unit type
-                        ctx.fillStyle = '#FFF';
+                        unitTypeStyle = '#FFF';
                 }
 
                 // Flip along the y-axis for drawing.
                 // This is because canvas is top-left based.
-                var px = unit.location.x;
-                var py = flipY(unit.location.y);
+                var px = interpLocation.x;
+                var py = flipY(interpLocation.y);
 
-                // Fill the border
-                ctx.fillRect(
-                    px * 500 / w, py * 500 / h,
-                    500 / w, 500 / h
-                )
+                
 
                 // The inside of the square represents the team allegiance
                 // and also health
-                var health_ratio = unit.health / MAX_HEALTHS[unit.unit_type];
-                ctx.fillStyle = '#FFF';
-                ctx.fillRect(
-                    (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH) * 500 / h,
-                    (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
-                );
-                ctx.fillStyle = ctx.strokeStyle = TEAM_COLOR[id2team[unit.id]];
-                ctx.lineWidth = 1;
-                ctx.strokeRect(
-                    (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH) * 500 / h,
-                    (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
-                );
-                ctx.fillRect(
-                    (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH + (1 - 2 * BORDER_WIDTH) * (1 - health_ratio)) * 500 / h,
-                    (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * health_ratio * 500 / h
-                );
+
+                if (fractional_t > DamageTime) {
+                    health = lerpf(prevUnit.health, unit.health, (fractional_t - DamageTime)/(1 - DamageTime)) / MAX_HEALTHS[unit.unit_type];
+                } else {
+                    health = prevUnit.health / MAX_HEALTHS[unit.unit_type];
+                }
+
+                if (unit.unit_type == "Factory" || unit.unit_type == "Rocket") {
+                    // Fill the border
+                    ctx.fillStyle = unitTypeStyle;
+                    ctx.fillRect(
+                        px * 500 / w, py * 500 / h,
+                        500 / w, 500 / h
+                    )
+
+                    ctx.fillStyle = '#FFF';
+                    ctx.fillRect(
+                        (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH) * 500 / h,
+                        (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
+                    );
+                    ctx.fillStyle = ctx.strokeStyle = TEAM_COLOR[id2team[unit.id]];
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(
+                        (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH) * 500 / h,
+                        (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
+                    );
+                    ctx.fillRect(
+                        (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH + (1 - 2 * BORDER_WIDTH) * (1 - health)) * 500 / h,
+                        (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * health * 500 / h
+                    );
+                } else {
+                    var cx = (px + 0.5) * 500 / w;
+                    var cy = (py + 0.5) * 500 / h;
+                    var radius = 0.3 * 500 / w;
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+                    ctx.strokeStyle = TEAM_COLOR[id2team[unit.id]];
+                    ctx.lineWidth = 6;
+                    ctx.stroke();
+
+                    if (health < 1) {
+                        ctx.fillStyle = "#FFF";
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+
+                    ctx.fillStyle = unitTypeStyle;
+                    ctx.beginPath();
+                    // Fill from bottom to top
+                    let angle = Math.asin(health * 2 - 1);
+                    ctx.arc(cx, cy, radius, Math.PI * 0.5, -angle, true);
+                    ctx.arc(cx, cy, radius, Math.PI + angle, Math.PI * 0.5, true);
+
+                    // Radial health
+                    // ctx.arc(cx, cy, health * radius, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
 
                 ctx.globalAlpha = 1;
             }
@@ -299,10 +379,22 @@ function visualize(data) {
         //  but are rendered this turn for ease of viewing)
         for (var i = 0; i < data[t].changes.length; i += 1) {
             var change = data[t].changes[i];
+            let target = null;
+            let robot = null;
+
             if ('Attack' in change) {
                 var attack = change['Attack'];
-                var target = attack.target_unit_id, robot = attack.robot_id;
+                target = attack.target_unit_id;
+                robot = attack.robot_id;
+            }
 
+            if ('Heal' in change) {
+                var heal = change['Heal'];
+                target = heal.target_robot_id;
+                robot = heal.healer_id;
+            }
+
+            if (robot != null) {
                 if (unit_locations[target][2] != planet || unit_locations[robot][2] != planet)
                     continue;
 
@@ -319,47 +411,187 @@ function visualize(data) {
                     y: flipY(unit_locations[target][1])
                 };
 
-                ctx.strokeStyle = '#F0F';
-                ctx.lineWidth = 5;
-                ctx.beginPath();
-                ctx.moveTo(
-                    (rpos.x + 0.5) * 500 / w,
-                    (rpos.y + 0.5) * 500 / h);
-                ctx.lineTo(
-                    (tpos.x + 0.5) * 500 / w,
-                    (tpos.y + 0.5) * 500 / h);
-                ctx.stroke();
+                if (unit_types[robot] == 'Ranger') {
+                    var interPos1 = lerp(rpos, tpos, (fractional_t - 0.3) / DamageTime);
+                    var interPos2 = lerp(rpos, tpos, (fractional_t) / DamageTime);
 
-                ctx.fillStyle = '#F0F';
-                ctx.fillRect(
-                    (tpos.x + 0.5) * 500 / w - HEAD_SIZE / 2 * 500 / w,
-                    (tpos.y + 0.5) * 500 / h - HEAD_SIZE / 2 * 500 / h,
-                    HEAD_SIZE * 500 / w,
-                    HEAD_SIZE * 500 / h
-                );
+                    ctx.strokeStyle = ATTACK_COLOR[id2team[robot]];
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        (interPos1.x + 0.5) * 500 / w,
+                        (interPos1.y + 0.5) * 500 / h);
+                    ctx.lineTo(
+                        (interPos2.x + 0.5) * 500 / w,
+                        (interPos2.y + 0.5) * 500 / h);
+                    ctx.stroke();
 
-                // Render splash damage from mages
-                if (unit_types[robot] == 'Mage') {
-                    for (var dx = -1; dx <= 1; dx += 1) {
-                        for (var dy = -1; dy <= 1; dy += 1) {
-                            ctx.strokeStyle = '#F0F';
-                            ctx.lineWidth = 5;
-                            ctx.beginPath();
-                            ctx.moveTo(
-                                (tpos.x + 0.5) * 500 / w,
-                                (tpos.y + 0.5) * 500 / h);
-                            ctx.lineTo(
-                                (tpos.x + 0.5 + dx) * 500 / w,
-                                (tpos.y + 0.5 + dy) * 500 / h);
-                            ctx.stroke();
+                    if (fractional_t > DamageTime && fractional_t < DamageTime + 0.1) {
+                        let size = (fractional_t - DamageTime)/0.1;
+                        ctx.beginPath();
+                        ctx.arc(
+                            (tpos.x + 0.5) * 500 / w,
+                            (tpos.y + 0.5) * 500 / h,
+                            size * HEAD_SIZE * 500 / w,
+                            // size * HEAD_SIZE * 500 / h,
+                            0,
+                            2 * Math.PI
+                        );
+                        ctx.fillStyle = '#F0F';
+                        ctx.fill();
+                    }
+                } else if (unit_types[robot] == 'Healer') {
+                    var t0 = (fractional_t - 0.3) / DamageTime;
+                    var t1 = (fractional_t) / DamageTime;
+                    var interPos1 = lerp(rpos, tpos, t0);
+                    var interPos2 = lerp(rpos, tpos, t1);
+
+                    ctx.strokeStyle = HEAL_COLOR[id2team[robot]];
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+
+                    let normal = vectorNormalize(vectorRotate90(vectorSub(interPos2, interPos1)));
+                    for (let i = 0; i <= 20; i++) {
+                        let tx = lerpf(t0, t1, i * 0.05);
+                        let p = lerp(rpos, tpos, tx);
+                        let offset = 0.05 * Math.sin(tx * 30);
+                        p.x += normal.x * offset;
+                        p.y += normal.y * offset;
+                        if (i == 0) ctx.moveTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
+                        else ctx.lineTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
+                    }
+
+                    ctx.stroke();
+
+                    if (fractional_t > DamageTime && fractional_t < DamageTime + 0.1) {
+                        let size = (fractional_t - DamageTime)/0.1;
+                        ctx.beginPath();
+                        ctx.arc(
+                            (tpos.x + 0.5) * 500 / w,
+                            (tpos.y + 0.5) * 500 / h,
+                            size * HEAD_SIZE * 500 / w,
+                            // size * HEAD_SIZE * 500 / h,
+                            0,
+                            2 * Math.PI
+                        );
+                        ctx.fillStyle = '#F0F';
+                        ctx.fill();
+                    }
+
+                } else if (unit_types[robot] == 'Knight') {
+                    var interPos1 = lerp(rpos, tpos, (fractional_t - 0.3) / DamageTime);
+                    var interPos2 = lerp(rpos, tpos, (fractional_t) / DamageTime);
+
+                    ctx.strokeStyle = ATTACK_COLOR[id2team[robot]];
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        (interPos1.x + 0.5) * 500 / w,
+                        (interPos1.y + 0.5) * 500 / h);
+                    ctx.lineTo(
+                        (interPos2.x + 0.5) * 500 / w,
+                        (interPos2.y + 0.5) * 500 / h);
+                    ctx.stroke();
+
+                    if (fractional_t > DamageTime && fractional_t < DamageTime + 0.1) {
+                        let size = (fractional_t - DamageTime)/0.1;
+                        ctx.beginPath();
+                        ctx.arc(
+                            (tpos.x + 0.5) * 500 / w,
+                            (tpos.y + 0.5) * 500 / h,
+                            size * HEAD_SIZE * 500 / w,
+                            // size * HEAD_SIZE * 500 / h,
+                            0,
+                            2 * Math.PI
+                        );
+                        ctx.fillStyle = '#F0F';
+                        ctx.fill();
+                    }
+                } else if (unit_types[robot] == 'Mage') {
+                    var interPos1 = lerp(rpos, tpos, (fractional_t - 0.3) / DamageTime);
+                    var interPos2 = lerp(rpos, tpos, (fractional_t) / DamageTime);
+
+                    ctx.strokeStyle = ATTACK_COLOR[id2team[robot]];
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        (interPos1.x + 0.5) * 500 / w,
+                        (interPos1.y + 0.5) * 500 / h);
+                    ctx.lineTo(
+                        (interPos2.x + 0.5) * 500 / w,
+                        (interPos2.y + 0.5) * 500 / h);
+                    ctx.stroke();
+
+                    if (fractional_t > DamageTime && fractional_t < DamageTime + 0.1) {
+                        let size = (fractional_t - DamageTime)/0.1;
+                        ctx.beginPath();
+                        ctx.arc(
+                            (tpos.x + 0.5) * 500 / w,
+                            (tpos.y + 0.5) * 500 / h,
+                            size * HEAD_SIZE * 500 / w,
+                            // size * HEAD_SIZE * 500 / h,
+                            0,
+                            2 * Math.PI
+                        );
+                        ctx.fillStyle = '#F0F';
+                        ctx.fill();
+                    }
+
+                    // Render splash damage from mages
+                    if (fractional_t > DamageTime - 0.1 && fractional_t < DamageTime + 0.05) {
+                        for (var dx = -1; dx <= 1; dx += 1) {
+                            for (var dy = -1; dy <= 1; dy += 1) {
+                                ctx.strokeStyle = '#F0F';
+                                ctx.lineWidth = 5;
+                                ctx.beginPath();
+                                ctx.moveTo(
+                                    (tpos.x + 0.5) * 500 / w,
+                                    (tpos.y + 0.5) * 500 / h);
+                                ctx.lineTo(
+                                    (tpos.x + 0.5 + dx) * 500 / w,
+                                    (tpos.y + 0.5 + dy) * 500 / h);
+                                ctx.stroke();
+                            }
                         }
                     }
+                } else {
+                    console.log("Unknown attack type for " + unit_types[robot]);
+                    // ???
                 }
             }
         }
     }
 
-    function render(t) {
+    let lastTime = performance.now() * 0.001;
+    let realtime = 0;
+    let first = true;
+
+    function render(timestamp) {
+        // Another map has been loaded, don't render anymore
+        if (currentID != activeID) return;
+        if (first) {
+            first = false;
+            lastTime = timestamp;
+        }
+
+        let dt = timestamp * 0.001 - lastTime;
+        // ?? Apparently might happen at the first frame
+        if (dt < 0) dt = 0;
+
+        lastTime = timestamp * 0.001;
+        if (slider_held || paused) {
+            dt = 0;
+        }
+        if (timeout > 0) {
+            realtime += dt * 1/(timeout * 0.001);
+        }
+        if (reset) {
+            realtime = 0;
+        }
+
+        realtime = Math.max(0, Math.min(realtime, data.length - 1));
+        const ti = Math.floor(realtime);
+
         var earth_unit_count = {};
         var mars_unit_count = {};
 
@@ -372,17 +604,19 @@ function visualize(data) {
             }
         }
 
-        render_planet(t, 'Earth', earth_ctx, earth_canvas, earth_unit_count);
-        render_planet(t, 'Mars', mars_ctx, mars_canvas, mars_unit_count);
+        render_planet(ti, realtime - ti, 'Earth', earth_ctx, earth_canvas, earth_unit_count);
+        render_planet(ti, realtime - ti, 'Mars', mars_ctx, mars_canvas, mars_unit_count);
 
-        // This sets the value of the slider to the current turn.
-        // Note: Turn number should be 1-indexed when displayed.
-        document.getElementById('turnslider').value = (t - t % 4) / 4 + 1;
+        if (!slider_held) {
+            // This sets the value of the slider to the current turn.
+            // Note: Turn number should be 1-indexed when displayed.
+            document.getElementById('turnslider').value = (ti - ti % 4) / 4 + 1;
+        }
 
         // Render Karbonite reserves and turn number
         document.getElementById('turn').innerText = document.getElementById('turnslider').value.toString();
-        document.getElementById('blue_karbonite').innerText = reserves[t][0].toString();
-        document.getElementById('red_karbonite').innerText = reserves[t][1].toString();
+        document.getElementById('blue_karbonite').innerText = reserves[ti][0].toString();
+        document.getElementById('red_karbonite').innerText = reserves[ti][1].toString();
 
         // Render unit count for each team
         for (var i = 0, team; team = TEAMS[i]; i++) {
@@ -392,27 +626,16 @@ function visualize(data) {
             }
         }
 
-        // Schedule next animation frame
-        if (slider_held || paused || reset || t + 1 < data.length) {
-            var new_t = t + 1;
-            if (reset) {
-                // We want to restart.
-                reset = false;
-                new_t = 0;
-            } else if (slider_held || paused) {
-                // We want to pause.
-                new_t = t;
-            }
-
-            current_anim_timeout = setTimeout(function() {
-                render(new_t);
-            }, timeout);
+        if (ti < data.length - 1) {
             document.getElementById('winner').innerText = '';
         } else {
             // It's the end
             document.getElementById('winner').innerText = winner + ' wins! (' + team_name[winner] + ')';
             document.getElementById('winner').style.color = TEAM_COLOR[winner];
         }
+
+        // Schedule next animation frame
+        window.requestAnimationFrame(render);
     }
 
     // A bunch of slider + button event handlers
@@ -422,12 +645,8 @@ function visualize(data) {
     document.getElementById('turnslider').removeEventListener('mouseup', mouseup_listener);
 
     document.getElementById('turnslider').addEventListener('input', input_listener = function(e) {
-        // Clear current timeout
-        clearTimeout(current_anim_timeout);
-
         // Render the first value of t represented by the given turn
-        var t = (this.value - 1) * 4;
-        render(t);
+        realtime = (this.value - 1) * 4;
     });
 
     document.getElementById('turnslider').addEventListener('mousedown', mousedown_listener = function(e) {
@@ -452,7 +671,7 @@ function visualize(data) {
     paused = false;
     document.getElementById('pause').innerText = 'Pause';
 
-    render(0);
+    window.requestAnimationFrame(render);
 }
 
 // Pressing "enter" on the input starts the request for the replay.
@@ -472,7 +691,7 @@ document.getElementById('fname').addEventListener('keydown', function(e) {
 
                 // Parse replay file
                 var data = JSON.parse(q.responseText);
-
+                console.log("Parsing!");
                 visualize(data);
             }
         };
@@ -495,6 +714,7 @@ document.getElementById('ffile').addEventListener('change', function(e) {
         // Parse replay file
         var data = JSON.parse(txt);
 
+        console.log("Parsing 2!");
         visualize(data);
     }
 

@@ -14,7 +14,7 @@ var earth_canvas = document.getElementById('earth');
 var earth_ctx = earth_canvas.getContext('2d');
 var mars_canvas = document.getElementById('mars');
 var mars_ctx = mars_canvas.getContext('2d');
-var timeout = 10;
+var timeout = 40;
 var activeID = 0;
 
 // Set default timeout value
@@ -360,7 +360,13 @@ function visualize(data) {
 
                     ctx.fillStyle = unitTypeStyle;
                     ctx.beginPath();
-                    ctx.arc(cx, cy, health * radius, 0, 2 * Math.PI);
+                    // Fill from bottom to top
+                    let angle = Math.asin(health * 2 - 1);
+                    ctx.arc(cx, cy, radius, Math.PI * 0.5, -angle, true);
+                    ctx.arc(cx, cy, radius, Math.PI + angle, Math.PI * 0.5, true);
+
+                    // Radial health
+                    // ctx.arc(cx, cy, health * radius, 0, 2 * Math.PI);
                     ctx.fill();
                 }
 

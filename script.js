@@ -759,7 +759,9 @@ function visualize(data) {
             document.getElementById('winner').innerText = '';
         } else {
             // It's the end
-            document.getElementById('winner').innerText = winner + ' wins! (' + team_name[winner] + ')';
+            var name = ' (' + team_name[winner] + ')';
+            if (!team_name[winner]) name = '';
+            document.getElementById('winner').innerText = winner + name + ' wins!';
             document.getElementById('winner').style.color = TEAM_COLOR[winner];
         }
 
@@ -849,3 +851,28 @@ document.getElementById('ffile').addEventListener('change', function(e) {
 
     reader.readAsText(file);
 });
+
+// Trigger if local path provided in url
+var regex = new RegExp("[?&]fname(=([^&#]*)|&|#|$)");
+var results = regex.exec(window.location.href);
+if (results && results[2]) {
+    var txt = decodeURIComponent(results[2].replace(/\+/g, " "));
+    document.getElementById('fname').value = txt;
+    var event;
+    if (document.createEvent) {
+        event = document.createEvent("HTMLEvents");
+        event.initEvent("keydown", true, true);
+    } else {
+        event = document.createEventObject();
+        event.eventType = "keydown";
+    }
+
+    event.eventName = "keydown";
+    event.which = 13;
+
+    if (document.createEvent) {
+        document.getElementById('fname').dispatchEvent(event);
+    } else {
+        document.getElementById('fname').fireEvent("on" + event.eventType, event);
+    }
+}

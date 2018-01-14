@@ -638,7 +638,7 @@ function visualize(data) {
         }
     }
 
-    function render_graph(ctx, values, x, y, w, h) {
+    function render_graph(ctx, values, x, y, w, h, colors) {
         ctx.save();
 
         ctx.beginPath();
@@ -663,10 +663,9 @@ function visualize(data) {
             for (let j = 0; j < categories; j++) {
                 mx = Math.max(mx, values[i][j]);
             }
-            
         }
 
-        colors = ["rgba(228,26,28, 0.8)", "rgba(55,126,184, 0.8)"];
+        colors = colors || ["rgba(228,26,28, 0.8)", "rgba(55,126,184, 0.8)"];
 
         mx *= 1.2;
 
@@ -687,7 +686,7 @@ function visualize(data) {
 
     function render_graphs(time, ctx) {
         let width = ctx.canvas.width;
-        render_graph(ctx, reserves, 0, 0, 300, 200);
+        render_graph(ctx, reserves, 0, 0, 300, 200, ["rgba(55,126,184, 0.8)", "rgba(228,26,28, 0.8)"]); // Reserves are reversed colors for whatever reason
         render_graph(ctx, unitValueByTime, width/2 - 300/2, 0, 300, 200);
         render_graph(ctx, [0,1,0,1,0,1], width - 300, 0, 300, 200);
     }

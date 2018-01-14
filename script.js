@@ -73,6 +73,18 @@ function vectorNormalize(v) {
     return { x: v.x/magn, y: v.y/magn }
 }
 
+function handleLocationClick(canvas, planetName, planetWidth, planetHeight){
+	var tileWidth = canvas.width/planetWidth;
+	var tileHeight = canvas.height/planetHeight;
+	return function(event){
+		//https://stackoverflow.com/questions/55677/how-do-i-get-the-coordinates-of-a-mouse-click-on-a-canvas-element
+		var rect = canvas.getBoundingClientRect();
+		var x = Math.floor((event.clientX - rect.left)/tileWidth);
+		var y = planetHeight-Math.floor((event.clientY - rect.top)/tileHeight)-1;
+		document.getElementById('location').innerText = planetName + '[' + x + ' - ' + y + ']';
+	}
+}
+
 function visualize(data) {
     activeID += 1;
     let currentID = activeID;
@@ -795,6 +807,9 @@ function visualize(data) {
     document.getElementById('reset').addEventListener('click', function(e) {
         reset = true;
     })
+    
+    earth_canvas.addEventListener('click', handleLocationClick(earth_canvas, 'EARTH', w, h));
+    mars_canvas.addEventListener('click', handleLocationClick(mars_canvas, 'MARS', w, h));
 
     // We're about to render, so let's force unpause.
     paused = false;
@@ -820,7 +835,6 @@ document.getElementById('fname').addEventListener('keydown', function(e) {
 
                 // Parse replay file
                 var data = JSON.parse(q.responseText);
-                console.log("Parsing!");
                 visualize(data);
             }
         };
@@ -842,8 +856,7 @@ document.getElementById('ffile').addEventListener('change', function(e) {
 
         // Parse replay file
         var data = JSON.parse(txt);
-
-        console.log("Parsing 2!");
+        
         visualize(data);
     }
 

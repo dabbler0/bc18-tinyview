@@ -374,8 +374,6 @@ function visualize(data) {
                 var px = interpLocation.x;
                 var py = flipY(interpLocation.y);
 
-                
-
                 // The inside of the square represents the team allegiance
                 // and also health
 
@@ -420,7 +418,7 @@ function visualize(data) {
                     ctx.lineWidth = 6 * lineWidthMultiplier;
                     ctx.stroke();
 
-                    if (health < 1 - 1e-3) {
+                    if (health < 1) {
                         ctx.fillStyle = "#FFF";
                         ctx.beginPath();
                         ctx.arc(cx, cy, radius, 0, 2 * Math.PI);

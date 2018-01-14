@@ -10,14 +10,24 @@ var BORDER_WIDTH = 0.2;
 
 // Globals
 var mousedown_listener, mouseup_listener, input_listener;
+var research_canvas = document.getElementById('research');
 var earth_canvas = document.getElementById('earth');
 var graph_canvas = document.getElementById('graphs');
+var research_ctx = research_canvas.getContext('2d');
 var graph_ctx = graph_canvas.getContext('2d');
 var earth_ctx = earth_canvas.getContext('2d');
 var mars_canvas = document.getElementById('mars');
 var mars_ctx = mars_canvas.getContext('2d');
 var timeout = 40;
 var activeID = 0;
+
+var classIcons = {};
+for (let i = 0; i < UNIT_CLASSES.length; i++) {
+    let img = new Image();
+    img.src = "images/" + UNIT_CLASSES[i] + ".svg";
+    classIcons[UNIT_CLASSES[i]] = img;
+}
+
 
 // Set default timeout value
 document.getElementById('timeout').value = timeout;
@@ -71,6 +81,17 @@ function vectorRotate90(v) {
 function vectorNormalize(v) {
     var magn = Math.sqrt(v.x*v.x + v.y*v.y);
     return { x: v.x/magn, y: v.y/magn }
+}
+
+function clamp01(x) {
+    return Math.max(0, Math.min(1, x));
+}
+
+function moveLinear(from, to, t) {
+    let delta = Math.abs(to - from);
+    t = Math.min(t, delta);
+    t = Math.max(t, 0);
+    return from + Math.sign(to - from) * t;
 }
 
 function handleLocationClick(canvas, planetName, planetWidth, planetHeight){
@@ -237,15 +258,7 @@ function visualize(data) {
             values[id2teamIndex[units[i].id]] += unit_values[units[i].unit_type];
         }
         unitValueByTime.push(values);
-        // for (let team = 0; team <= 1; team++) {
-        //     let unitValue = 0;
-        //     let karbonite = 0;
-        //     data[t].units
-            
-        // }
     }
-    console.log(unitValueByTime);
-    
 
     // set the maximum turn we could slide to
     var t = data.length - 1;
@@ -301,9 +314,11 @@ function visualize(data) {
                     ctx.fillStyle = '#337';
                     ctx.fill();
                     ctx.globalAlpha = 1.0;
-                    // ctx.fillStyle = '#888';
-                    // ctx.fillText(karbonite_at_tick[i][j].toString(),
-                    //         (px + 0.4) * (500 / w), (py + 0.6) * 500 / h);
+                    ctx.fillStyle = '#888';
+                    ctx.textBaseline = "middle";
+                    ctx.textAlign = "center";
+                    ctx.fillText(karbonite_at_tick[i][j].toString(),
+                            (px + 0.5) * (500 / w), (py + 0.5) * 500 / h + 2);
                 }
             }
         }
@@ -466,6 +481,11 @@ function visualize(data) {
         //  but are rendered this turn for ease of viewing)
         for (var i = 0; i < data[t].changes.length; i += 1) {
             var change = data[t].changes[i];
+
+            // Required to avoid exceptions when trying to use the 'in' operator.
+            // It will not work on the 'ResetResearchQueue' event which is a string, not an object.
+            if (typeof change !== 'object') continue;
+
             let target = null;
             let robot = null;
 
@@ -697,9 +717,156 @@ function visualize(data) {
 
     function render_graphs(time, ctx) {
         let width = ctx.canvas.width;
-        render_graph(ctx, reserves, 0, 0, 300, 200, ["rgba(55,126,184, 0.8)", "rgba(228,26,28, 0.8)"]); // Reserves are reversed colors for whatever reason
-        render_graph(ctx, unitValueByTime, width/2 - 300/2, 0, 300, 200);
-        render_graph(ctx, [0,1,0,1,0,1], width - 300, 0, 300, 200);
+        render_graph(ctx, reserves, 0, 100, 300, 150, ["rgba(55,126,184, 0.8)", "rgba(228,26,28, 0.8)"]); // Reserves are reversed colors for whatever reason
+        render_graph(ctx, unitValueByTime, width/2 - 300/2, 100, 300, 150);
+        render_graph(ctx, [0,1,0,1,0,1], width - 300, 100, 300, 150);
+    }
+
+    let researchEvents = [[], []];
+    for (let t = 0; t < data.length; t++) {
+        let eventBuffer = researchEvents[t % 2];
+
+        let changes = data[t].additional_changes;
+        for (let i = 0; i < changes.length; i++) {
+            if ("ResearchComplete" in changes[i]) {
+                let item = changes[i]["ResearchComplete"];
+                let buffer = eventBuffer;
+
+                // This is currently bugged in the engine
+                // Awaiting engine fix
+                if ("team" in item) {
+                    // Yay! The Engine has been fixed
+                    buffer = researchEvents[TEAMS.indexOf(item.team)];
+                }
+
+                for (let j = 0; j < buffer.length; j++) {
+                    if (buffer[j].end_turn == -1) {
+                        if (buffer[j].branch != item.branch) {
+                            console.log("Incorrect research was completed. Expected " + buffer[j].branch + " but got " + item.branch + ". This error will be removed once a bug in the battlecode engine is patched");
+                            break;
+                        }
+                        buffer[j].end_turn = t;
+
+                        // Start next research
+                        for (let q = 0; q < buffer.length; q++) {
+                            if (buffer[q].start_active_turn == -1 && !buffer[q].cancelled) {
+                                buffer[q].start_active_turn = t;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        changes = data[t].changes;
+        for (let i = 0; i < changes.length; i++) {
+            if (changes[i] == "ResetResearchQueue") {
+                for (let j = 0; j < eventBuffer.length; j++) {
+                    if (eventBuffer[j].end_turn == -1) {
+                        eventBuffer[j].cancelled = true;
+                        eventBuffer[j].end_turn = t;
+                    }
+                }
+            } else if ("QueueResearch" in changes[i]) {
+                let item = changes[i]["QueueResearch"];
+                let anyActive = false;
+                for (let j = 0; j < eventBuffer.length; j++) {
+                    // Active!
+                    if (eventBuffer[j].end_turn == -1) {
+                        anyActive = true;
+                    }
+                }
+                eventBuffer.push({
+                    branch: item.branch,
+                    start_turn: t,
+                    end_turn: -1,
+                    start_active_turn: anyActive ? -1 : t,
+                    cancelled: false,
+                });
+            }
+        }
+    }
+
+    let TeamResearchColors = ["#e41a1c", "#377eb8"];
+    let TeamResearchColorsAccent = ["#870f11", "#25567d"];
+    function render_research_team(time, ctx, team, team_events, x, UIdt) {
+        let y = 2;
+        let height = 48;
+        let width = 90;
+
+        for (let i = 0; i < team_events.length; i++) {
+            let item = team_events[i];
+            let time_to_start = item.start_turn - time;
+            let time_to_end = item.end_turn - time;
+            if (item.end_turn == -1) time_to_end = 1000;
+
+            let alpha1 = Math.max(0, Math.min(1, 1 - (time_to_start)));
+            let alpha2 = Math.max(0, Math.min(1, (time_to_end + 1)));
+            if (!item.cancelled) alpha2 = 1;
+
+            if (item.ui_alpha == undefined) {
+                item.ui_alpha = 0;
+            }
+
+            let alpha = alpha1 * alpha2;
+            item.ui_alpha = moveLinear(item.ui_alpha, alpha, (1 + 2/(i+1)) * UIdt);
+            alpha = item.ui_alpha;
+            if (alpha > 0.001) {
+
+                let level = 1;
+                for (let j = 0; j < i; j++) {
+                    // Check if visible
+                    if (time < team_events[j].start_turn) continue;
+                    if (team_events[j].cancelled && time >= team_events[j].end_turn) continue;
+
+                    if (team_events[j].branch == item.branch) level++;
+                }
+
+                ctx.globalAlpha = alpha;
+                let fractionCompleted = item.cancelled || item.start_active_turn == -1 || item.end_turn == -1 ? 0 : 1 - (time_to_end / (item.end_turn - item.start_active_turn));
+                fractionCompleted = Math.max(0, Math.min(1, fractionCompleted));
+
+                ctx.fillStyle = TeamResearchColors[team];
+                ctx.beginPath();
+                ctx.rect(x, y, width, alpha2 * height);
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = TeamResearchColorsAccent[team];
+                ctx.fill();
+                ctx.stroke();
+
+                let img = classIcons[item.branch];
+                let iconW = 30;
+                let iconH = 30;
+                ctx.drawImage(img, x + 10, y + height/2 - iconH/2, iconW, iconH);
+
+                if (fractionCompleted >= 1) {
+                    ctx.fillStyle = "#fff17c";
+                } else {
+                    ctx.fillStyle = '#FFF';
+                }
+                ctx.textBaseline = "middle";
+                ctx.textAlign = "center";
+                ctx.font = '1.5em Roboto';
+                ctx.fillText("" + level, x + width - 24, y + height/2 + 3);
+
+                ctx.beginPath();
+                ctx.fillStyle = "rgba(0,0,0,0.2)"
+                ctx.rect(x, y, width, height * alpha2 * (1 - fractionCompleted));
+                ctx.fill();
+
+                y += height * alpha2;
+                ctx.globalAlpha = 1.0;
+            }
+        }
+        
+    }
+
+    function render_research(time, ctx, UIdt) {
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        render_research_team(time, ctx, 0, researchEvents[0], 118, UIdt);
+        render_research_team(time, ctx, 1, researchEvents[1], 118 + 90, UIdt);
     }
 
     let lastTime = performance.now() * 0.001;
@@ -719,8 +886,11 @@ function visualize(data) {
         if (dt < 0) dt = 0;
 
         lastTime = timestamp * 0.001;
+        let UIdt = dt;
         if (slider_held || paused) {
             dt = 0;
+            // Make UI progress very quickly to reach the final state in their animations
+            UIdt = 10;
         }
         if (timeout > 0) {
             realtime += dt * 1/(timeout * 0.001);
@@ -747,6 +917,7 @@ function visualize(data) {
         render_planet(ti, realtime - ti, 'Earth', earth_ctx, earth_canvas, earth_unit_count);
         render_planet(ti, realtime - ti, 'Mars', mars_ctx, mars_canvas, mars_unit_count);
         render_graphs(realtime, graph_ctx);
+        render_research(realtime, research_ctx, UIdt);
 
         if (!slider_held) {
             // This sets the value of the slider to the current turn.

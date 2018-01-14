@@ -31,6 +31,7 @@ Contributing
 Nice-to-haves:
  - Visualize units in space
  - Visualize units in garrison of buildings (possibly only on mouseover)
+ - Visualize research queue and completed research
  - Show attacks when paused
  - Add additional detailed info with mouseover or click, including precise health, cooldown, precise location, precise Karbonite
  - Allow toggling Fog of War for given player

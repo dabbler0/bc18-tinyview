@@ -428,9 +428,10 @@ function visualize(data) {
                     ctx.fillStyle = unitTypeStyle;
                     ctx.beginPath();
                     // Fill from bottom to top
-                    let angle = Math.asin(health * 2 - 1);
-                    ctx.arc(cx, cy, radius, Math.PI * 0.5, -angle, true);
-                    ctx.arc(cx, cy, radius, Math.PI + angle, Math.PI * 0.5, true);
+                    let angle = Math.asin((health * 2 - 1) * (1 - 1e-3));
+                    //ctx.arc(cx, cy, radius, Math.PI * 0.5, -angle, true);
+                    //ctx.arc(cx, cy, radius, Math.PI + angle, Math.PI * 0.5, true);
+                    ctx.arc(cx, cy, radius, Math.PI + angle, -angle, true);
 
                     // Radial health
                     // ctx.arc(cx, cy, health * radius, 0, 2 * Math.PI);

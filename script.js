@@ -420,7 +420,7 @@ function visualize(data) {
                     ctx.lineWidth = 6 * lineWidthMultiplier;
                     ctx.stroke();
 
-                    if (health < 1) {
+                    if (health < 1 - 1e-3) {
                         ctx.fillStyle = "#FFF";
                         ctx.beginPath();
                         ctx.arc(cx, cy, radius, 0, 2 * Math.PI);

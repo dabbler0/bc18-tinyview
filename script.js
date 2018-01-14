@@ -715,6 +715,7 @@ function visualize(data) {
         }
         if (reset) {
             realtime = 0;
+            reset = false;
         }
 
         realtime = Math.max(0, Math.min(realtime, data.length - 1));
@@ -759,7 +760,9 @@ function visualize(data) {
             document.getElementById('winner').innerText = '';
         } else {
             // It's the end
-            document.getElementById('winner').innerText = winner + ' wins! (' + team_name[winner] + ')';
+            var name = ' (' + team_name[winner] + ')';
+            if (!team_name[winner]) name = '';
+            document.getElementById('winner').innerText = winner + name + ' wins!';
             document.getElementById('winner').style.color = TEAM_COLOR[winner];
         }
 

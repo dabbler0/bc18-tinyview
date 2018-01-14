@@ -314,9 +314,11 @@ function visualize(data) {
                     ctx.fillStyle = '#337';
                     ctx.fill();
                     ctx.globalAlpha = 1.0;
-                    // ctx.fillStyle = '#888';
-                    // ctx.fillText(karbonite_at_tick[i][j].toString(),
-                    //         (px + 0.4) * (500 / w), (py + 0.6) * 500 / h);
+                    ctx.fillStyle = '#888';
+                    ctx.textBaseline = "middle";
+                    ctx.textAlign = "center";
+                    ctx.fillText(karbonite_at_tick[i][j].toString(),
+                            (px + 0.5) * (500 / w), (py + 0.5) * 500 / h + 2);
                 }
             }
         }
@@ -845,9 +847,9 @@ function visualize(data) {
                     ctx.fillStyle = '#FFF';
                 }
                 ctx.textBaseline = "middle";
-                ctx.textAling = "center";
+                ctx.textAlign = "center";
                 ctx.font = '1.5em Roboto';
-                ctx.fillText("" + level, x + width - 30, y + height/2 + 3);
+                ctx.fillText("" + level, x + width - 24, y + height/2 + 3);
 
                 ctx.beginPath();
                 ctx.fillStyle = "rgba(0,0,0,0.2)"

@@ -31,25 +31,54 @@ input {
 }
 
 .viewer {
-    float: center;
+    margin-left: auto;
+    margin-right: auto;
+    width: 1350px;
 }
 
 .maps {
     display: inline-block;
-    float: left;
+    float: right;
+}
+
+.graphs {
+    float: right;
 }
 
 .info {
     display: inline-block;
     font-weight: bold;
-    min-width: 110px;
+    width: 300px;
     float: left;
     padding: 10px;
     text-align: left;
 }
 
+.info table {
+    background: #333;
+    border: 1px solid #333;
+    border-radius: 5px;
+    color: #FFF;
+    width: 100%;
+    border-spacing: 0px;
+}
+
+.info table tr {
+    height: 30px;
+}
+
 .property {
     text-align: left;
+}
+
+.infoRed {
+    background: #e41a1c;
+    width: 50px;
+}
+
+.infoBlue {
+    background: #377eb8;
+    width: 50px;
 }
 
 /* make table a bit more readable */

@@ -26,11 +26,22 @@ Hit "Reset" to, well, reset and start the animation over from the beginning.
 Contributing
 ------------
 
-This viewer is not very good and needs improvement. Fork this repository and make pull requests and I will merge them when I'm paying attention. General things that need to be done:
- - Make sure we're not making off-by-one-turn errors with when things should be rendered
- - Visualize Mars at all (done but untested for any units)
- - Distinguish between different types of units (done except for rockets)
+~~This viewer is not very good and needs improvement.~~ Tinyviewer is pretty good thanks to contributions from HalfVoxel, ChiCubed, gabrielsimoes, and stefangimmillaro. Fork this repository and make pull requests and I will merge them when I'm paying attention.
+
+Nice-to-haves:
+ - Visualize units in space
+ - Visualize units in garrison of buildings (possibly only on mouseover)
+ - Visualize research queue and completed research
+ - Show attacks when paused
+ - Add additional detailed info with mouseover or click, including precise health, cooldown, precise location, precise Karbonite
+ - Allow toggling Fog of War for given player
+ - Create an annotation format; players should be able to make special log files, and if we load them alongside the game, render lines and dots on the map (like last year).
+
+ Finished TODOS
+ ---------------
+ - Visualize Mars at all (done)
+ - Distinguish between different types of units (done)
  - Visualize health bars on units (done)
- - Make visualizations for attacks that make clear who is attacking whom (done except for healers, javelin, snipe)
+ - Make visualizations for attacks that make clear who is attacking whom (done)
  - Show how many of each kind of unit each player has (done)
  - Implement a scrubber (done)

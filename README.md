@@ -28,6 +28,9 @@ Contributing
 
 ~~This viewer is not very good and needs improvement.~~ Tinyviewer is pretty good thanks to contributions from HalfVoxel, ChiCubed, gabrielsimoes, and stefangimmillaro. Fork this repository and make pull requests and I will merge them when I'm paying attention.
 
+Necessary:
+ - Handle non-square boards without distortion
+
 Nice-to-haves:
  - Visualize units in space
  - Visualize units in garrison of buildings (possibly only on mouseover)

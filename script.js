@@ -374,8 +374,6 @@ function visualize(data) {
                 var px = interpLocation.x;
                 var py = flipY(interpLocation.y);
 
-                
-
                 // The inside of the square represents the team allegiance
                 // and also health
 
@@ -430,9 +428,10 @@ function visualize(data) {
                     ctx.fillStyle = unitTypeStyle;
                     ctx.beginPath();
                     // Fill from bottom to top
-                    let angle = Math.asin(health * 2 - 1);
-                    ctx.arc(cx, cy, radius, Math.PI * 0.5, -angle, true);
-                    ctx.arc(cx, cy, radius, Math.PI + angle, Math.PI * 0.5, true);
+                    let angle = Math.asin((health * 2 - 1) * (1 - 1e-3));
+                    //ctx.arc(cx, cy, radius, Math.PI * 0.5, -angle, true);
+                    //ctx.arc(cx, cy, radius, Math.PI + angle, Math.PI * 0.5, true);
+                    ctx.arc(cx, cy, radius, Math.PI + angle, -angle, true);
 
                     // Radial health
                     // ctx.arc(cx, cy, health * radius, 0, 2 * Math.PI);
@@ -638,7 +637,7 @@ function visualize(data) {
         }
     }
 
-    function render_graph(ctx, values, x, y, w, h) {
+    function render_graph(ctx, values, x, y, w, h, colors) {
         ctx.save();
 
         ctx.beginPath();
@@ -663,10 +662,9 @@ function visualize(data) {
             for (let j = 0; j < categories; j++) {
                 mx = Math.max(mx, values[i][j]);
             }
-            
         }
 
-        colors = ["rgba(228,26,28, 0.8)", "rgba(55,126,184, 0.8)"];
+        colors = colors || ["rgba(228,26,28, 0.8)", "rgba(55,126,184, 0.8)"];
 
         mx *= 1.2;
 
@@ -687,7 +685,7 @@ function visualize(data) {
 
     function render_graphs(time, ctx) {
         let width = ctx.canvas.width;
-        render_graph(ctx, reserves, 0, 0, 300, 200);
+        render_graph(ctx, reserves, 0, 0, 300, 200, ["rgba(55,126,184, 0.8)", "rgba(228,26,28, 0.8)"]); // Reserves are reversed colors for whatever reason
         render_graph(ctx, unitValueByTime, width/2 - 300/2, 0, 300, 200);
         render_graph(ctx, [0,1,0,1,0,1], width - 300, 0, 300, 200);
     }

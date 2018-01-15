@@ -157,9 +157,6 @@ function visualize(data) {
         'Mars': [planet_maps['Mars'].map(function(x) { return x.map(function() { return 0; }); })]
     };
 
-    // Convenience dimension variables
-    var w = planet_maps['Earth'][0].length, h = planet_maps['Earth'].length;
-
     // Get the team identities of the initial units
     // (these are not given ever again so we need to remember)
     var initial_units = data[0].world.planet_states.Earth.units
@@ -264,11 +261,19 @@ function visualize(data) {
     var t = data.length - 1;
     document.getElementById('turnslider').max = (t - t % 4) / 4 + 1;
 
-    // This is used to invert the y-axis
-    function flipY(oy) { return (h - oy - 1); }
+    // Convenience dimension variables
+    var earth_w = planet_maps['Earth'][0].length, earth_h = planet_maps['Earth'].length;
+    // Convenience dimension variables
+    var mars_w = planet_maps['Mars'][0].length, mars_h = planet_maps['Mars'].length;
 
     // Now, to render an animation frame:
     function render_planet(t, fractional_t, planet, ctx, canvas, unit_count) {
+        // Convenience dimension variables
+        var w = planet_maps[planet][0].length, h = planet_maps[planet].length;
+
+        // This is used to invert the y-axis
+        function flipY(oy) { return (h - oy - 1); }
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -454,7 +459,8 @@ function visualize(data) {
 
                     ctx.fillStyle = unitTypeStyle;
                     ctx.beginPath();
-                    // Fill from bottom to top
+                    // Fill from bottom to top. Don't let angle be exactly Math.PI or
+                    // rounding error can cause the circle not to fill at all.
                     let angle = Math.asin((health * 2 - 1) * (1 - 1e-3));
                     //ctx.arc(cx, cy, radius, Math.PI * 0.5, -angle, true);
                     //ctx.arc(cx, cy, radius, Math.PI + angle, Math.PI * 0.5, true);
@@ -982,8 +988,8 @@ function visualize(data) {
         reset = true;
     })
     
-    earth_canvas.addEventListener('click', handleLocationClick(earth_canvas, 'EARTH', w, h));
-    mars_canvas.addEventListener('click', handleLocationClick(mars_canvas, 'MARS', w, h));
+    earth_canvas.addEventListener('click', handleLocationClick(earth_canvas, 'EARTH', earth_w, earth_h));
+    mars_canvas.addEventListener('click', handleLocationClick(mars_canvas, 'MARS', mars_w, mars_h));
 
     // We're about to render, so let's force unpause.
     paused = false;

@@ -37,21 +37,6 @@ document.getElementById('timeout').addEventListener('change', function(e) {
     timeout = document.getElementById('timeout').value;
 });
 
-// Create tags for representing each team's unit count
-// for (var i = 0, team; team = TEAMS[i]; i++) {
-//     teamInfo = document.getElementById('info' + team);
-//     for (var j = 0, unit_class; unit_class = UNIT_CLASSES[j]; j++) {
-//         var property = document.createElement('p');
-//         property.setAttribute('class', 'property')
-//         property.innerText = unit_class + ': ';
-
-//         var field = document.createElement('span');
-//         field.setAttribute('id', 'info' + team + unit_class);
-//         property.appendChild(field);
-//         teamInfo.appendChild(property);
-//     }
-// }
-
 /*
 Visualize a replay file given a JSON object
 corresponding to the file.
@@ -266,92 +251,96 @@ function visualize(data) {
     // Convenience dimension variables
     var mars_w = planet_maps['Mars'][0].length, mars_h = planet_maps['Mars'].length;
 
-    // Now, to render an animation frame:
-    function render_planet(t, fractional_t, planet, ctx, canvas, unit_count) {
+    function render_planet_background(t, planet, ctx) {
         // Convenience dimension variables
         var w = planet_maps[planet][0].length, h = planet_maps[planet].length;
 
         // This is used to invert the y-axis
         function flipY(oy) { return (h - oy - 1); }
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Draw background
+        if (planet == 'Mars') {
+            ctx.fillStyle = "#e4cdc0";
+        } else {
+            ctx.fillStyle = "#FFF";
+        }
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-        // ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        // Draw the map
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "center";
 
         let karbonite_at_tick = karbonite_maps[planet][t];
 
-        // Draw the map
-        for (var i = 0; i < h; i += 1) {
-            for (var j = 0; j < w; j += 1) {
+        for (var i = 0; i < h; i++) {
+            for (var j = 0; j < w; j++) {
                 // Flip along y-axis
                 var px = j, py = flipY(i);
 
-                // Black out impassable squares
-                ctx.beginPath();
-                ctx.rect(px * (500 / w), py * (500 / h), 500 / w, 500 / h);
+                var impassable = !planet_maps[planet][i][j];
+                var karbs = karbonite_at_tick[i][j] > 0;
 
-                if (!planet_maps[planet][i][j]) {
-                    if (planet == 'Mars') {
-                        ctx.fillStyle = '#5d1e10';
-                        ctx.strokeStyle = '#591d0f';
-                    } else {
-                        ctx.fillStyle = '#306796';
-                        ctx.strokeStyle = '#2e6491';
+                if (impassable || karbs) {
+                    ctx.beginPath();
+                    // Draw a rect. It is 1 pixel larger than the tile to avoid graphical artifacts at the borders between tiles
+                    ctx.rect(px * (500 / w) - 0.5, py * (500 / h) - 0.5, 500 / w + 0.5, 500 / h + 0.5);
+
+                    // Black out impassable squares
+                    if (impassable) {
+                        if (planet == 'Mars') {
+                            ctx.fillStyle = '#5d1e10';
+                        } else {
+                            ctx.fillStyle = '#306796';
+                        }
+
+                        ctx.fill();
                     }
 
-                } else {
-                    if (planet == 'Mars') {
-                        ctx.fillStyle = "#e4cdc0";
-                        ctx.strokeStyle = '#c4b0a5';
-                    } else {
-                        ctx.fillStyle = "#FFF";
-                        ctx.strokeStyle = '#e4e4e4';
+                    if (karbs) {
+                        // Write amount of Karbonite at location
+                        ctx.globalAlpha = (karbonite_at_tick[i][j] > 0 ? 0.2 : 0.0) + 0.6 * (karbonite_at_tick[i][j] / 50);
+                        ctx.fillStyle = '#337';
+                        ctx.fill();
+                        ctx.globalAlpha = 1.0;
+                        ctx.fillStyle = '#888';
+                        ctx.fillText(karbonite_at_tick[i][j].toString(),
+                                (px + 0.5) * (500 / w), (py + 0.5) * 500 / h + 2);
                     }
-                }
-                
-                ctx.fill();
-                ctx.lineWidth = 1;
-                ctx.stroke();
-
-                if (karbonite_at_tick[i][j] > 0) {
-                    // Write amount of Karbonite at location
-                    ctx.globalAlpha = (karbonite_at_tick[i][j] > 0 ? 0.2 : 0.0) + 0.6 * (karbonite_at_tick[i][j] / 50);
-                    ctx.fillStyle = '#337';
-                    ctx.fill();
-                    ctx.globalAlpha = 1.0;
-                    ctx.fillStyle = '#888';
-                    ctx.textBaseline = "middle";
-                    ctx.textAlign = "center";
-                    ctx.fillText(karbonite_at_tick[i][j].toString(),
-                            (px + 0.5) * (500 / w), (py + 0.5) * 500 / h + 2);
                 }
             }
         }
 
-        // Render units
-        var unit_locations = {};
-        var unit_types = {};
-        if (t > 0) {
-            for (var i = 0; i < data[t - 1].units.length; i += 1) {
-                var unit = data[t - 1].units[i];
-                unit_locations[unit.id] = [unit.location.x, unit.location.y, unit.location.planet];
-            }
+        ctx.strokeStyle = "rgba(0,0,0,0.1)";
+        ctx.lineWidth = 1;
+
+        // Draw grid lines
+        for (var y = 0; y < h; y++) {
+            ctx.beginPath();
+            ctx.moveTo(0, y * (500 / h));
+            ctx.lineTo(500, y * (500 / h));
+            ctx.stroke();
         }
-
-        let prevUnits = {}
-        if (t > 0) {
-            for (var i = 0; i < data[t - 1].units.length; i += 1) {
-                var unit = data[t - 1].units[i];
-                prevUnits[unit.id] = unit;
-            }
+        for (var x = 0; x < h; x++) {
+            ctx.beginPath();
+            ctx.moveTo(x * (500 / w), 0);
+            ctx.lineTo(x * (500 / w), 500);
+            ctx.stroke();
         }
-        
+    }
 
-        const DamageTime = 0.7;
-        const MoveFinishedTime = 0.8;
+    const DamageTime = 0.7;
+    const MoveFinishedTime = 0.8;
 
-        for (var i = 0; i < data[t].units.length; i += 1) {
-            var unit = data[t].units[i];
+    function render_units(t, fractional_t, planet, ctx, unit_locations, unit_types, prevUnits, unit_count) {
+        // Convenience dimension variables
+        var w = planet_maps[planet][0].length, h = planet_maps[planet].length;
+
+        // This is used to invert the y-axis
+        function flipY(oy) { return (h - oy - 1); }
+
+        let units = data[t].units;
+        for (var i = 0; i < units.length; i += 1) {
+            var unit = units[i];
 
             var prevUnit = prevUnits[unit.id];
             if (prevUnit === undefined) prevUnit = unit;
@@ -481,6 +470,14 @@ function visualize(data) {
                 ctx.globalAlpha = 1;
             }
         }
+    }
+
+    function render_attacks(t, fractional_t, planet, ctx, unit_locations, unit_types, prevUnits) {
+        // Convenience dimension variables
+        var w = planet_maps[planet][0].length, h = planet_maps[planet].length;
+
+        // This is used to invert the y-axis
+        function flipY(oy) { return (h - oy - 1); }
 
         // Render attacks
         // (these are technically made the next turn,
@@ -673,6 +670,34 @@ function visualize(data) {
                 }
             }
         }
+    }
+
+    // Now, to render an animation frame:
+    function render_planet(t, fractional_t, planet, ctx, canvas, unit_count) {
+        // Convenience dimension variables
+        var w = planet_maps[planet][0].length, h = planet_maps[planet].length;
+
+        // This is used to invert the y-axis
+        function flipY(oy) { return (h - oy - 1); }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        render_planet_background(t, planet, ctx);
+
+        // Render units
+        var unit_locations = {};
+        var unit_types = {};
+        let prevUnits = {}
+        if (t > 0) {
+            for (var i = 0; i < data[t - 1].units.length; i += 1) {
+                var unit = data[t - 1].units[i];
+                unit_locations[unit.id] = [unit.location.x, unit.location.y, unit.location.planet];
+                prevUnits[unit.id] = unit;
+            }
+        }
+
+        render_units(t, fractional_t, planet, ctx, unit_locations, unit_types, prevUnits, unit_count);
+        render_attacks(t, fractional_t, planet, ctx, unit_locations, unit_types, prevUnits);
     }
 
     function render_graph(ctx, values, x, y, w, h, colors) {

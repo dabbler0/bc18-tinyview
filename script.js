@@ -330,6 +330,7 @@ function visualize(data) {
 
     const DamageTime = 0.7;
     const MoveFinishedTime = 0.8;
+    const OverchargeTime = 0.4;
 
     function render_units(t, fractional_t, planet, ctx, unit_locations, unit_types, prevUnits, unit_count) {
         // Convenience dimension variables
@@ -479,6 +480,8 @@ function visualize(data) {
         // This is used to invert the y-axis
         function flipY(oy) { return (h - oy - 1); }
 
+        let attacksByUnit = {};
+
         // Render attacks
         // (these are technically made the next turn,
         //  but are rendered this turn for ease of viewing)
@@ -491,15 +494,23 @@ function visualize(data) {
 
             let target = null;
             let robot = null;
+            let isAbility = false;
+
+            if ('Overcharge' in change) {
+                let heal = change['Overcharge'];
+                target = heal.target_robot_id;
+                robot = heal.healer_id;
+                isAbility = true;
+            }
 
             if ('Attack' in change) {
-                var attack = change['Attack'];
+                let attack = change['Attack'];
                 target = attack.target_unit_id;
                 robot = attack.robot_id;
             }
 
             if ('Heal' in change) {
-                var heal = change['Heal'];
+                let heal = change['Heal'];
                 target = heal.target_robot_id;
                 robot = heal.healer_id;
             }
@@ -521,9 +532,23 @@ function visualize(data) {
                     y: flipY(unit_locations[target][1])
                 };
 
+                if (!(robot in attacksByUnit)) {
+                    attacksByUnit[robot] = 0;
+                }
+
+                let previousAttacks = attacksByUnit[robot];
+                attacksByUnit[robot] = previousAttacks + 1;
+
+                let attackTime = fractional_t;
+                if (!isAbility) {
+                    // Will modify time to make later attacks happen later during the frame
+                    // Will still happen during 0...1
+                    attackTime = clamp01(1 - (1 - attackTime) * (previousAttacks + 1));
+                }
+
                 if (unit_types[robot] == 'Ranger') {
-                    var interPos1 = lerp(rpos, tpos, (fractional_t - 0.3) / DamageTime);
-                    var interPos2 = lerp(rpos, tpos, (fractional_t) / DamageTime);
+                    var interPos1 = lerp(rpos, tpos, (attackTime - 0.3) / DamageTime);
+                    var interPos2 = lerp(rpos, tpos, (attackTime) / DamageTime);
 
                     ctx.strokeStyle = ATTACK_COLOR[id2team[robot]];
                     ctx.lineWidth = 5;
@@ -536,8 +561,8 @@ function visualize(data) {
                         (interPos2.y + 0.5) * 500 / h);
                     ctx.stroke();
 
-                    if (fractional_t > DamageTime && fractional_t < DamageTime + 0.1) {
-                        let size = (fractional_t - DamageTime)/0.1;
+                    if (attackTime > DamageTime && attackTime < DamageTime + 0.1) {
+                        let size = (attackTime - DamageTime)/0.1;
                         ctx.beginPath();
                         ctx.arc(
                             (tpos.x + 0.5) * 500 / w,
@@ -551,46 +576,95 @@ function visualize(data) {
                         ctx.fill();
                     }
                 } else if (unit_types[robot] == 'Healer') {
-                    var t0 = (fractional_t - 0.3) / DamageTime;
-                    var t1 = (fractional_t) / DamageTime;
-                    var interPos1 = lerp(rpos, tpos, t0);
-                    var interPos2 = lerp(rpos, tpos, t1);
+                    if (isAbility) {
+                        // Overcharge!
+                        var t0 = (attackTime - 0.3) / OverchargeTime;
+                        var t1 = (attackTime) / OverchargeTime;
+                        var interPos1 = lerp(rpos, tpos, t0);
+                        var interPos2 = lerp(rpos, tpos, t1);
 
-                    ctx.strokeStyle = HEAL_COLOR[id2team[robot]];
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-
-                    let normal = vectorNormalize(vectorRotate90(vectorSub(interPos2, interPos1)));
-                    for (let i = 0; i <= 20; i++) {
-                        let tx = lerpf(t0, t1, i * 0.05);
-                        let p = lerp(rpos, tpos, tx);
-                        let offset = 0.05 * Math.sin(tx * 30);
-                        p.x += normal.x * offset;
-                        p.y += normal.y * offset;
-                        if (i == 0) ctx.moveTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
-                        else ctx.lineTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
-                    }
-
-                    ctx.stroke();
-
-                    if (fractional_t > DamageTime && fractional_t < DamageTime + 0.1) {
-                        let size = (fractional_t - DamageTime)/0.1;
+                        ctx.strokeStyle = "#12e5ca";
+                        ctx.lineWidth = 3;
                         ctx.beginPath();
-                        ctx.arc(
-                            (tpos.x + 0.5) * 500 / w,
-                            (tpos.y + 0.5) * 500 / h,
-                            size * HEAD_SIZE * 500 / w,
-                            // size * HEAD_SIZE * 500 / h,
-                            0,
-                            2 * Math.PI
-                        );
-                        ctx.fillStyle = '#F0F';
-                        ctx.fill();
+
+
+                        let normal = vectorNormalize(vectorRotate90(vectorSub(interPos2, interPos1)));
+                        for (let i = 0; i <= 20; i++) {
+                            let tx = lerpf(t0, t1, i * 0.05);
+                            let p = lerp(rpos, tpos, tx);
+                            let offset = 0.05 * Math.sin(tx * 30);
+                            p.x += normal.x * offset;
+                            p.y += normal.y * offset;
+                            if (i == 0) ctx.moveTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
+                            else ctx.lineTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
+                        }
+
+                        ctx.stroke();
+
+                        let effectEnd = 0.9;
+                        let effectStart = 0.1;
+                        if (attackTime > 0.1 && attackTime < 0.9) {
+                            let tposx = (tpos.x + 0.5) * 500 / w;
+                            let tposy = (tpos.y + 0.5) * 500 / h;
+                            ctx.beginPath();
+                            let lines = 9;
+                            let innerRadius = 0.5;
+                            let outerRadius = 0.8 + attackTime * 0.2;
+                            let angleOffset = attackTime * 0.5 * Math.PI;
+                            for (let i = 0; i < 9; i++) {
+                                let angle = (i / lines) * 2 * Math.PI;
+                                ctx.moveTo(tposx + innerRadius * Math.cos(angle + angleOffset) * (500 / w), tposy + innerRadius * Math.sin(angle + angleOffset) * (500 / w));
+                                ctx.lineTo(tposx + outerRadius * Math.cos(angle + angleOffset) * (500 / w), tposy + outerRadius * Math.sin(angle + angleOffset) * (500 / w));
+                            }
+                            ctx.strokeStyle = "#12e5ca";
+                            ctx.lineWidth = 2;
+                            ctx.globalAlpha = clamp01((effectEnd - attackTime) / 0.1);
+                            ctx.stroke();
+                            ctx.globalAlpha = 1.0;
+                        }
+                    } else {
+                        // Heal
+                        var t0 = (attackTime - 0.3) / DamageTime;
+                        var t1 = (attackTime) / DamageTime;
+                        var interPos1 = lerp(rpos, tpos, t0);
+                        var interPos2 = lerp(rpos, tpos, t1);
+
+                        ctx.strokeStyle = HEAL_COLOR[id2team[robot]];
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+
+                        let normal = vectorNormalize(vectorRotate90(vectorSub(interPos2, interPos1)));
+                        for (let i = 0; i <= 20; i++) {
+                            let tx = lerpf(t0, t1, i * 0.05);
+                            let p = lerp(rpos, tpos, tx);
+                            let offset = 0.05 * Math.sin(tx * 30);
+                            p.x += normal.x * offset;
+                            p.y += normal.y * offset;
+                            if (i == 0) ctx.moveTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
+                            else ctx.lineTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
+                        }
+
+                        ctx.stroke();
+
+                        if (attackTime > DamageTime && attackTime < DamageTime + 0.1) {
+                            let size = (attackTime - DamageTime)/0.1;
+                            ctx.beginPath();
+                            ctx.arc(
+                                (tpos.x + 0.5) * 500 / w,
+                                (tpos.y + 0.5) * 500 / h,
+                                size * HEAD_SIZE * 500 / w,
+                                // size * HEAD_SIZE * 500 / h,
+                                0,
+                                2 * Math.PI
+                            );
+                            ctx.fillStyle = '#F0F';
+                            ctx.fill();
+                        }
                     }
 
                 } else if (unit_types[robot] == 'Knight') {
-                    var interPos1 = lerp(rpos, tpos, (fractional_t - 0.3) / DamageTime);
-                    var interPos2 = lerp(rpos, tpos, (fractional_t) / DamageTime);
+                    var interPos1 = lerp(rpos, tpos, (attackTime - 0.3) / DamageTime);
+                    var interPos2 = lerp(rpos, tpos, (attackTime) / DamageTime);
 
                     ctx.strokeStyle = ATTACK_COLOR[id2team[robot]];
                     ctx.lineWidth = 5;
@@ -603,8 +677,8 @@ function visualize(data) {
                         (interPos2.y + 0.5) * 500 / h);
                     ctx.stroke();
 
-                    if (fractional_t > DamageTime && fractional_t < DamageTime + 0.1) {
-                        let size = (fractional_t - DamageTime)/0.1;
+                    if (attackTime > DamageTime && attackTime < DamageTime + 0.1) {
+                        let size = (attackTime - DamageTime)/0.1;
                         ctx.beginPath();
                         ctx.arc(
                             (tpos.x + 0.5) * 500 / w,
@@ -618,8 +692,8 @@ function visualize(data) {
                         ctx.fill();
                     }
                 } else if (unit_types[robot] == 'Mage') {
-                    var interPos1 = lerp(rpos, tpos, (fractional_t - 0.3) / DamageTime);
-                    var interPos2 = lerp(rpos, tpos, (fractional_t) / DamageTime);
+                    var interPos1 = lerp(rpos, tpos, (attackTime - 0.3) / DamageTime);
+                    var interPos2 = lerp(rpos, tpos, (attackTime) / DamageTime);
 
                     ctx.strokeStyle = ATTACK_COLOR[id2team[robot]];
                     ctx.lineWidth = 5;
@@ -632,8 +706,8 @@ function visualize(data) {
                         (interPos2.y + 0.5) * 500 / h);
                     ctx.stroke();
 
-                    if (fractional_t > DamageTime && fractional_t < DamageTime + 0.1) {
-                        let size = (fractional_t - DamageTime)/0.1;
+                    if (attackTime > DamageTime && attackTime < DamageTime + 0.1) {
+                        let size = (attackTime - DamageTime)/0.1;
                         ctx.beginPath();
                         ctx.arc(
                             (tpos.x + 0.5) * 500 / w,
@@ -648,7 +722,7 @@ function visualize(data) {
                     }
 
                     // Render splash damage from mages
-                    if (fractional_t > DamageTime - 0.1 && fractional_t < DamageTime + 0.05) {
+                    if (attackTime > DamageTime - 0.1 && attackTime < DamageTime + 0.05) {
                         for (var dx = -1; dx <= 1; dx += 1) {
                             for (var dy = -1; dy <= 1; dy += 1) {
                                 ctx.strokeStyle = '#F0F';

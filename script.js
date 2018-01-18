@@ -1027,20 +1027,45 @@ document.getElementById('fname').addEventListener('keydown', function(e) {
 document.getElementById('ffile').addEventListener('change', function(e) {
     var file = this.files[0];
 
-    // Read the contents of the file
-    var reader = new FileReader();
+    // Is the file gzipped?
+    if (file.name.indexOf('.bc18z') !== -1) {
+        // Read the contents of the file
+        var reader = new FileReader();
 
-    // FileReader loads -- callback:
-    reader.onload = function(e) {
-        var txt = reader.result;
+        // FileReader loads -- callback:
+        reader.onload = function(e) {
+            var array = new Uint8Array(reader.result);
 
-        // Parse replay file
-        var data = JSON.parse(txt);
-        
-        visualize(data);
+            try {
+                // Parse replay file
+                var data = JSON.parse(pako.inflate(array, {to: 'string'}));
+
+                visualize(data);
+            }
+            catch (err) {
+                alert('Could not decompress gzipped .bc18z file.');
+            }
+
+        }
+
+        reader.readAsArrayBuffer(file);
     }
+    else {
+        // Read the contents of the file
+        var reader = new FileReader();
 
-    reader.readAsText(file);
+        // FileReader loads -- callback:
+        reader.onload = function(e) {
+            var txt = reader.result;
+
+            // Parse replay file
+            var data = JSON.parse(txt);
+
+            visualize(data);
+        }
+
+        reader.readAsText(file);
+    }
 });
 
 // Trigger if local path provided in url

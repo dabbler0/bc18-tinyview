@@ -2,7 +2,7 @@
   Browserified version of pako.js.
 
   Built by calling `browserify index.js -s pako` on
-  https://github.com://nodeca.com/pako on 2017-01-18.
+  https://github.com://nodeca.com/pako on 2018-01-18.
 
   (The MIT License)
 

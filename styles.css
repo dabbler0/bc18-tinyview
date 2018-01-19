@@ -1,0 +1,85 @@
+/* font includes */
+@import url('https://fonts.googleapis.com/css?family=Inconsolata|Roboto');
+
+h1 {
+    font-family: Inconsolata;
+    font-size: 2.5em;
+    text-align: center;
+}
+
+h2 {
+    font-family: Roboto;
+    font-size: 2em;
+    text-align: center;
+}
+
+/* this also takes care of canvas centering, how convenient */
+div {
+    font-family: Roboto;
+    font-size: 1em;
+    text-align: center;
+}
+
+button {
+    font-family: Roboto;
+    font-size: 1em;
+}
+
+input {
+    font-family: Inconsolata;
+    font-size: 1em;
+}
+
+.viewer {
+    margin-left: auto;
+    margin-right: auto;
+    width: 1350px;
+}
+
+.maps {
+    display: inline-block;
+    float: right;
+}
+
+.graphs {
+    float: right;
+}
+
+.info {
+    display: inline-block;
+    font-weight: bold;
+    width: 300px;
+    float: left;
+    padding: 10px;
+    text-align: left;
+}
+
+.info table {
+    background: #333;
+    border: 1px solid #333;
+    border-radius: 5px;
+    color: #FFF;
+    width: 100%;
+    border-spacing: 0px;
+}
+
+.info table tr {
+    height: 30px;
+}
+
+.property {
+    text-align: left;
+}
+
+.infoRed {
+    background: #e41a1c;
+    width: 50px;
+}
+
+.infoBlue {
+    background: #377eb8;
+    width: 50px;
+}
+
+/* make table a bit more readable */
+th, td { padding: 0px 20px; }

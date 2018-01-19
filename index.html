@@ -1,68 +1,19 @@
 <html>
-<!--
-A minimalist viewer for Battlecode 2018 replay files.
+<head>
+    <!-- Here's a simple stylesheet to make things look a bit better. -->
+    <link rel="stylesheet" href="styles.css">
+</head>
 
-General TODOs:
-    - Make sure we're not making off-by-one-turn errors with when things should be rendered
-    - Visualize Mars at all
-    - Distinguish between different types of units (started)
-    - Visualize health bars on units
-    - Make visualizations for attacks that make clear who is attacking whom
-    - Show how many of each kind of unit each player has
-    - Implement a scrubber (mostly done)
--->
-
-<!-- Here's a simple stylesheet to make things look a bit better. -->
-<style>
-    /* font includes */
-    @import url('https://fonts.googleapis.com/css?family=Inconsolata|Roboto');
-    
-    h1 {
-        font-family: Inconsolata;
-        font-size: 2.5em;
-        text-align: center;
-    }
-    
-    h2 {
-        font-family: Roboto;
-        font-size: 2em;
-        text-align: center;
-    }
-    
-    /* this also takes care of canvas centering, how convenient */
-    div {
-        font-family: Roboto;
-        font-size: 1em;
-        text-align: center;
-    }
-    
-    button {
-        font-family: Roboto;
-        font-size: 1em;
-    }
-    
-    input {
-        font-family: Inconsolata;
-        font-size: 1em;
-    }
-    
-    /* center the table and set font */
-    table {
-        font-family: Roboto;
-        font-size: 1em;
-        
-        margin-left: auto;
-        margin-right: auto;
-    }
-    
-    /* make table a bit more readable */
-    th, td { padding: 0px 20px; }
-</style>
-    
 <body>
     <h1>bc18-tinyviewer</h1>
-    <div><label for="fname">If you're hosting the website locally:</label> <input id="fname" placeholder="filepath"/></div>
-    <div><label for="ffile">Upload a file:</label> <input id="ffile" type="file"/></div>
+    <div>
+        <label for="fname">If you're hosting the website locally:</label>
+        <input id="fname" placeholder="filepath"/>
+    </div>
+    <div>
+        <label for="ffile">Upload a file:</label>
+        <input id="ffile" type="file"/>
+    </div>
     <div id="loading"></div>
     <div>
         <label for="timeout">Set time delay per turn (ms):</label>
@@ -72,448 +23,37 @@ General TODOs:
         <label for="turnslider">Go to turn #:</label>
         <input id="turnslider" type="range" min="1"/>
         <button id="pause">Pause</button>
+        <button id="reset">Reset</button>
     </div>
-    <br/>
-    <table>
-        <tr><th>Turn #</th><th>Red Karbonite</th><th>Blue Karbonite</th></tr>
-        <tr><td><span id="turn"></span></td><td><span id="red"></span></td><td><span id="blue"></span></td></tr>
-    </table>
-    <div><canvas id="main" width=500 height=500 style="border: 1px solid #000"></canvas></div>
     <h2 id="winner"></h2>
+    <div class="viewer">
+        <div class="info">
+            <h3 style="text-align:center;">Turn: #<span id="turn"></span></h3>
+            <h3 style="text-align:center;">Location: <span id="location"></span></h3>
+            <table>
+                <tr><td>Karbonite</td><td class="infoRed" id="red_karbonite"></td><td class="infoBlue" id="blue_karbonite"></td></tr>
+                <tr><td>Workers</td><td class="infoRed" id="infoRedWorker"></td><td class="infoBlue" id="infoBlueWorker"></td></tr>
+                <tr><td>Knights</td><td class="infoRed" id="infoRedKnight"></td><td class="infoBlue" id="infoBlueKnight"></td></tr>
+                <tr><td>Rangers</td><td class="infoRed" id="infoRedRanger"></td><td class="infoBlue" id="infoBlueRanger"></td></tr>
+                <tr><td>Mages</td><td class="infoRed" id="infoRedMage"></td><td class="infoBlue" id="infoBlueMage"> </td></tr>
+                <tr><td>Healers</td><td class="infoRed" id="infoRedHealer"></td><td class="infoBlue" id="infoBlueHealer"></td></tr>
+                <tr><td>Factories</td><td class="infoRed" id="infoRedFactory"></td><td class="infoBlue" id="infoBlueFactory"></td></tr>
+                <tr><td>Rockets</td><td class="infoRed" id="infoRedRocket"></td><td class="infoBlue" id="infoBlueRocket"></td></tr>
+            </table>
+            <canvas id="research" width=300 height=600"></canvas>
+        </div>
+        <div class="maps">
+            <canvas id="earth" width=500 height=500 style="border: 1px solid #000"></canvas>
+            <canvas id="mars" width=500 height=500 style="border: 1px solid #000"></canvas>
+        </div>
+        <div class="graphs">
+            <canvas id="graphs" width=1006 height=250 style="border: 1px solid #000"></canvas>
+        </div>
+        <div style="color: #CCC; padding-top: 20px; display: inline-block;"><span>Icons from Noun Project by Mat Rutherford, To Uyen, Geovani Almeida, Maciej Świerczek, SBTS, Robert Bjurshagen and Xinh Studio.</span></div>
+    </div>
 
-<script>
+  <script src="pako.js"></script>
+  <script src="script.js"></script>
 
-var mousedown_listener, mouseup_listener, input_listener, needs_clear = false;
-var HEAD_SIZE = 0.3;
-var MAX_HEALTHS = {'Worker': 100, 'Knight': 250, 'Factory': 300, 'Ranger': 200, 'Mage': 80};
-
-var BORDER_WIDTH = 0.2;
-var canvas = document.getElementById('main');
-var ctx = canvas.getContext('2d');
-
-var timeout = 10;
-var winner;
-document.getElementById('timeout').value = timeout;
-
-/*
-Allow setting replay speed
-*/
-document.getElementById('timeout').addEventListener('change', function(e) {
-    timeout = document.getElementById('timeout').value;
-});
-
-/*
-Visualize a replay file given a JSON object
-corresponding to the file.
-(This is prior to the messages within the replay file,
- which are strings corresponding to JSON objects,
- being parsed.)
-*/
-var current_anim_timeout = null;
-
-function visualize(data) {
-    // Globals
-    var TEAMS = ['Red', 'Blue'];
-    var TEAM_COLOR = {'Red': '#F00', 'Blue': '#00F'};
-    var id2team = {};
-    var maturation_times = {};
-    var earth_map, mars_map;
-    var reserves = [[100, 100]]; // Precomped for every turn
-
-    if (current_anim_timeout != null) {
-        clearTimeout(current_anim_timeout);
-    }
-    
-    // Whether or not the slider is currently being held down.
-    // This is used because the input event only fires
-    // when the slider's value is actively changing,
-    // but we want it to pause even if it is held in position.
-    var slider_held = false;
-    
-    // Whether or not we're currently paused.
-    var paused = false;
-
-    // Determine who won
-    winner = data['metadata'].winner;
-    // TODO Check if this is correct, it might be the other way round
-    if (winner == 'player1') winner = 'Blue';
-    else winner = 'Red';
-    
-    // Parse each turn from the replay file
-    data = data['message'].map(JSON.parse);
-    
-    // Clear info on the winner
-    document.getElementById('winner').innerText = '';
-
-    // Get impassable squares for Earth
-    earth_map = data[0].world.planet_maps.Earth.is_passable_terrain;
-    
-    // Get Karbonite data
-    // We'll precomp this for every turn
-    karbonite_maps = [data[0].world.planet_maps.Earth.initial_karbonite];
-
-    // Convenience dimension variables
-    var w = earth_map[0].length, h = earth_map.length;
-
-    // Get the team identities of the initial units
-    // (these are not given ever again so we need to remember)
-    var initial_units = data[0].world.planet_states.Earth.units
-    for (var key in initial_units) {
-        var unit = initial_units[key];
-        id2team[unit.id] = unit.team;
-    }
-
-    // Pop off the first "turn", whic is not a turn
-    // but instead an initialization object
-    data.shift();
-    
-    // We will now precomp Karbonite data,
-    // reserves data, and unit teams, to allow
-    // scrubbing.
-    for (var t = 0; t < data.length; t += 1) {
-        // Update Karbonite reserves if necessary.
-        // TODO:
-        // This currently will result in updating reserves
-        // _before_ being displayed for a turn.
-        // If this should occur _after_ being displayed
-        // for a turn instead, swap the two lines below.
-        reserves[reserves.length - 1][t % 2] = data[t].karbonite;
-        reserves.push(reserves[reserves.length - 1].slice(0));
-        
-        // If Karbonite on the board has changed, update our current counts
-        // TODO:
-        // This currently will result in updating counts
-        // _after_ being displayed for a turn.
-        // If this should occur _before_ being displayed
-        // for a turn instead, put the push after the for loop.
-        // TODO: handle mars updates here
-        karbonite_maps.push(karbonite_maps[karbonite_maps.length - 1].map(function(x) { return x.slice(0); }));
-        for (var i = 0; i < data[t].additional_changes.length; i += 1) {
-            var change = data[t].additional_changes[i];
-            if (change.KarboniteChanged != null && change.KarboniteChanged.location.planet === 'Earth') {
-                karbonite_maps[
-                    karbonite_maps.length - 1
-                ][
-                    change.KarboniteChanged.location.y
-                ][
-                    change.KarboniteChanged.location.x
-                ] = change.KarboniteChanged.new_amount;
-            }
-        }
-        
-        // Precomp units
-        for (var i = 0; i < data[t].units.length; i += 1) {
-            var unit = data[t].units[i];
-            if (unit.location.planet = 'Earth') {
-                // If this unit has never been seen before, it must
-                // have just been made. Thus it belongs to the current player.
-                if (!(unit.id in id2team)) {
-                    id2team[unit.id] = TEAMS[t % 2];
-
-                    // Factories, before they reach full health,
-                    // are actually just blueprints
-                    if (unit.unit_type == 'Factory' || unit.unit_type == 'Rocket') {
-                        maturation_times[unit.id] = Infinity;
-                    }
-                }
-
-                // Factories and rockets mature when they reach full health
-                if ((unit.unit_type == 'Factory' && unit.health == 300 ||
-                        unit.unit_type == 'Rocket' && unit.health == 200) &&
-                        maturation_times[unit.id] == Infinity) {
-                    maturation_times[unit.id] = t;
-                }
-            }
-        }
-    }
-    
-    // set the maximum turn we could slide to
-    var t = data.length - 1;
-    document.getElementById('turnslider').max = (t - t % 4) / 4 + 1;
-    
-    // This is used to invert the y-axis
-    function flipY(oy) { return (h - oy - 1); }
-
-    // Now, to render an animation frame:
-    function render(t) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Draw the map
-        for (var i = 0; i < h; i += 1) {
-            for (var j = 0; j < w; j += 1) {
-                // Flip along y-axis
-                var px = j, py = flipY(i);
-                
-                // Black out impassable squares
-                if (!earth_map[i][j]) {
-                    ctx.fillStyle = '#000'
-                        ctx.fillRect(px * (500 / w), py * (500 / h),
-                                500 / w, 500 / h);
-                }
-
-                // Write amount of Karbonite at location
-                ctx.fillStyle = '#888';
-                ctx.fillText(karbonite_maps[t][i][j].toString(),
-                        (px + 0.5) * (500 / w), (py + 0.5) * 500 / h);
-            }
-        }
-
-        // This sets the value of the slider to the current turn.
-        // Note: Turn number should be 1-indexed when displayed.
-        document.getElementById('turnslider').value = (t - t % 4) / 4 + 1;
-        
-        // Render Karbonite reserves and turn number
-        document.getElementById('turn').innerText = document.getElementById('turnslider').value.toString();
-        document.getElementById('blue').innerText = reserves[t][0].toString();
-        document.getElementById('red').innerText = reserves[t][1].toString();
-
-        // Render units
-        var unit_locations = {};
-        var unit_types = {};
-        for (var i = 0; i < data[t].units.length; i += 1) {
-            var unit = data[t].units[i];
-            if (unit.location.planet = 'Earth') {
-                // Render the unit in the correct color.
-                unit_locations[unit.id] = [unit.location.x, unit.location.y];
-                unit_types[unit.id] = unit.unit_type;
-
-                // Blueprints will be given an alpha
-                if ((unit.unit_type === "Factory" || unit.unit_type === "Rocket") &&
-                        maturation_times[unit.id] > t) {
-                    ctx.globalAlpha = 0.5;
-                }
-
-                // The border of the square will represent the
-                // unit type.
-                if (unit.unit_type === "Worker") {
-                    // Workers will be yellow, because whatever.
-                    ctx.fillStyle = '#FF0';
-                }
-                
-                else if (unit.unit_type === "Factory") {
-                    // Factories will be gray
-                    ctx.fillStyle = '#888';
-                }
-
-                else if (unit.unit_type == "Knight") {
-                    // Knights will be some kind of maroon
-                    ctx.fillStyle = '#800';
-                }
-
-                else if (unit.unit_type == "Ranger") {
-                    // Rangers will be some kind of dark green
-                    ctx.fillStyle = '#080';
-                }
-
-                else if (unit.unit_type == "Mage") {
-                    // Rangers will be some kind of dark blue
-                    ctx.fillStyle = '#008';
-                }
-
-                else {
-                    // Unimplemented unit type
-                    ctx.fillStyle = '#FFF';
-                }
-                
-                // Flip along the y-axis for drawing.
-                // This is because canvas is top-left based.
-                var px = unit.location.x;
-                var py = flipY(unit.location.y);
-
-                // Fill the border
-                ctx.fillRect(
-                    px * 500 / w, py * 500 / h,
-                    500 / w, 500 / h
-                )
-
-                // The inside of the square represents the team allegiance
-                // and also health
-                var health_ratio = unit.health / MAX_HEALTHS[unit.unit_type];
-                ctx.fillStyle = '#FFF';
-                ctx.fillRect(
-                    (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH) * 500 / h,
-                    (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
-                );
-                ctx.fillStyle = ctx.strokeStyle = TEAM_COLOR[id2team[unit.id]];
-                ctx.lineWidth = 1;
-                ctx.strokeRect(
-                    (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH) * 500 / h,
-                    (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
-                );
-                ctx.fillRect(
-                    (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH + (1 - 2 * BORDER_WIDTH) * (1 - health_ratio)) * 500 / h,
-                    (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * health_ratio * 500 / h
-                );
-
-                ctx.globalAlpha = 1;
-            }
-        }
-
-        // Render attacks
-        // (these are technically made the next turn,
-        //  but are rendered this turn for ease of viewing)
-        if (t + 1 < data.length) {
-            for (var i = 0; i < data[t + 1].changes.length; i += 1) {
-                var change = data[t + 1].changes[i];
-                if ('Attack' in change) {
-                    var attack = change['Attack'];
-                    var target = attack.target_unit_id, robot = attack.robot_id;
-                    
-                    // Store positions.
-                    // While we do this we flip the y-axis
-                    // for rendering to the canvas.
-                    var rpos = {
-                        x: unit_locations[robot][0],
-                        y: flipY(unit_locations[robot][1])
-                    };
-                    var tpos = {
-                        x: unit_locations[target][0],
-                        y: flipY(unit_locations[target][1])
-                    };
-
-                    ctx.strokeStyle = '#F0F';
-                    ctx.lineWidth = 5;
-                    ctx.beginPath();
-                    ctx.moveTo(
-                        (rpos.x + 0.5) * 500 / w,
-                        (rpos.y + 0.5) * 500 / h);
-                    ctx.lineTo(
-                        (tpos.x + 0.5) * 500 / w,
-                        (tpos.y + 0.5) * 500 / h);
-                    ctx.stroke();
-
-                    ctx.fillStyle = '#F0F';
-                    ctx.fillRect(
-                        (tpos.x + 0.5) * 500 / w - HEAD_SIZE / 2 * 500 / w,
-                        (tpos.y + 0.5) * 500 / h - HEAD_SIZE / 2 * 500 / h,
-                        HEAD_SIZE * 500 / w,
-                        HEAD_SIZE * 500 / h
-                    );
-                    
-                    // Render splash damage from mages
-                    if (unit_types[robot] == 'Mage') {
-                        for (var dx = -1; dx <= 1; dx += 1) {
-                            for (var dy = -1; dy <= 1; dy += 1) {
-                                ctx.strokeStyle = '#F0F';
-                                ctx.lineWidth = 5;
-                                ctx.beginPath();
-                                ctx.moveTo(
-                                    (tpos.x + 0.5) * 500 / w,
-                                    (tpos.y + 0.5) * 500 / h);
-                                ctx.lineTo(
-                                    (tpos.x + 0.5 + dx) * 500 / w,
-                                    (tpos.y + 0.5 + dy) * 500 / h);
-                                ctx.stroke();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Schedule next animation frame
-        if (t + 1 < data.length) {
-            var new_t = t + 1;
-            if (slider_held || paused) {
-                // We want to pause.
-                new_t = t;
-            }
-            
-            current_anim_timeout = setTimeout(function() {
-                render(new_t);
-            }, timeout);
-            document.getElementById('winner').innerText = '';
-        } else {
-            // It's the end
-            document.getElementById('winner').innerText = winner + ' wins!';
-            document.getElementById('winner').style.color = TEAM_COLOR[winner];
-        }
-    }
-    
-    // A bunch of slider + button event handlers
-    if (needs_clear) {
-        document.getElementById('turnslider').removeEventListener('input', input_listener);
-        document.getElementById('turnslider').removeEventListener('mousedown', mousedown_listener);
-        document.getElementById('turnslider').removeEventListener('mouseup', mouseup_listener);
-    }
-
-    needs_clear = true;
-
-    document.getElementById('turnslider').addEventListener('input', input_listener = function(e) {
-        // Clear current timeout
-        clearTimeout(current_anim_timeout);
-        
-        // Render the first value of t represented by the given turn
-        var t = (this.value - 1) * 4;
-        render(t);
-    });
-    
-    document.getElementById('turnslider').addEventListener('mousedown', mousedown_listener = function(e) {
-        slider_held = true;
-    });
-    
-    document.getElementById('turnslider').addEventListener('mouseup', mouseup_listener = function(e) {
-        slider_held = false; 
-    });
-    
-    document.getElementById('pause').addEventListener('click', function(e) {
-        paused = !paused;
-        if (paused) this.innerText = 'Resume';
-        else this.innerText = 'Pause';
-    })
-    
-    // We're about to render, so let's
-    // force unpause.
-    paused = false;
-    document.getElementById('pause').innerText = 'Pause';
-    
-    render(0);
-}
-
-// Pressing "enter" on the input starts the request for the replay.
-document.getElementById('fname').addEventListener('keydown', function(e) {
-    if (e.which === 13) {
-        var path = this.value;
-
-        // Request the replay file
-        var q = new XMLHttpRequest();
-        q.open('GET', path, true);
-        document.getElementById('loading').innerText = 'Loading...';
-
-        // Replay file arrives -- callback:
-        q.onreadystatechange = function() {
-            if (q.readyState == XMLHttpRequest.DONE) {
-                document.getElementById('loading').innerText = 'Done.';
-
-                // Parse replay file
-                var data = JSON.parse(q.responseText);
-
-                visualize(data);
-            }
-        };
-
-        q.send();
-    }
-});
-
-document.getElementById('ffile').addEventListener('change', function(e) {
-    var file = this.files[0];
-
-    // Read the contents of the file
-    var reader = new FileReader();
-
-    // FileReader loads -- callback:
-    reader.onload = function(e) {
-        var txt = reader.result;
-
-        // Parse replay file
-        var data = JSON.parse(txt);
-
-        visualize(data);
-    }
-
-    reader.readAsText(file);
-});
-</script>
 </body>
 </html>

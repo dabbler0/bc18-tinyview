@@ -250,6 +250,13 @@ function visualize(data) {
     var earth_w = planet_maps['Earth'][0].length, earth_h = planet_maps['Earth'].length;
     // Convenience dimension variables
     var mars_w = planet_maps['Mars'][0].length, mars_h = planet_maps['Mars'].length;
+    
+    // set canvas width / height
+    earth_canvas.width = 500;
+    earth_canvas.height = earth_canvas.width * earth_h / earth_w;
+    
+    mars_canvas.width = 500;
+    mars_canvas.height = mars_canvas.width * mars_h / mars_w;
 
     function render_planet_background(t, planet, ctx) {
         // Convenience dimension variables
@@ -283,7 +290,8 @@ function visualize(data) {
                 if (impassable || karbs) {
                     ctx.beginPath();
                     // Draw a rect. It is 1 pixel larger than the tile to avoid graphical artifacts at the borders between tiles
-                    ctx.rect(px * (500 / w) - 0.5, py * (500 / h) - 0.5, 500 / w + 0.5, 500 / h + 0.5);
+                    ctx.rect(px * (ctx.canvas.width / w) - 0.5, py * (ctx.canvas.height / h) - 0.5,
+                             ctx.canvas.width / w + 0.5, ctx.canvas.height / h + 0.5);
 
                     // Black out impassable squares
                     if (impassable) {
@@ -304,7 +312,7 @@ function visualize(data) {
                         ctx.globalAlpha = 1.0;
                         ctx.fillStyle = '#888';
                         ctx.fillText(karbonite_at_tick[i][j].toString(),
-                                (px + 0.5) * (500 / w), (py + 0.5) * 500 / h + 2);
+                                (px + 0.5) * (ctx.canvas.width / w), (py + 0.5) * ctx.canvas.height / h + 2);
                     }
                 }
             }
@@ -316,14 +324,14 @@ function visualize(data) {
         // Draw grid lines
         for (var y = 0; y < h; y++) {
             ctx.beginPath();
-            ctx.moveTo(0, y * (500 / h));
-            ctx.lineTo(500, y * (500 / h));
+            ctx.moveTo(0, y * (ctx.canvas.height / h));
+            ctx.lineTo(ctx.canvas.width, y * (ctx.canvas.height / h));
             ctx.stroke();
         }
         for (var x = 0; x < h; x++) {
             ctx.beginPath();
-            ctx.moveTo(x * (500 / w), 0);
-            ctx.lineTo(x * (500 / w), 500);
+            ctx.moveTo(x * (ctx.canvas.width / w), 0);
+            ctx.lineTo(x * (ctx.canvas.width / w), ctx.canvas.height);
             ctx.stroke();
         }
     }
@@ -409,29 +417,31 @@ function visualize(data) {
                     // Fill the border
                     ctx.fillStyle = unitTypeStyle;
                     ctx.fillRect(
-                        px * 500 / w, py * 500 / h,
-                        500 / w, 500 / h
+                        px * ctx.canvas.width / w, py * ctx.canvas.height / h,
+                        ctx.canvas.width / w, ctx.canvas.height / h
                     )
 
                     ctx.fillStyle = '#FFF';
                     ctx.fillRect(
-                        (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH) * 500 / h,
-                        (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
+                        (px + BORDER_WIDTH) * ctx.canvas.width / w, (py + BORDER_WIDTH) * ctx.canvas.height / h,
+                        (1 - 2 * BORDER_WIDTH) * ctx.canvas.width / w, (1 - 2 * BORDER_WIDTH) * ctx.canvas.height / h
                     );
                     ctx.fillStyle = ctx.strokeStyle = TEAM_COLOR[id2team[unit.id]];
                     ctx.lineWidth = 1;
                     ctx.strokeRect(
-                        (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH) * 500 / h,
-                        (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * 500 / h
+                        (px + BORDER_WIDTH) * ctx.canvas.width / w, (py + BORDER_WIDTH) * ctx.canvas.height / h,
+                        (1 - 2 * BORDER_WIDTH) * ctx.canvas.width / w, (1 - 2 * BORDER_WIDTH) * ctx.canvas.height / h
                     );
                     ctx.fillRect(
-                        (px + BORDER_WIDTH) * 500 / w, (py + BORDER_WIDTH + (1 - 2 * BORDER_WIDTH) * (1 - health)) * 500 / h,
-                        (1 - 2 * BORDER_WIDTH) * 500 / w, (1 - 2 * BORDER_WIDTH) * health * 500 / h
+                        (px + BORDER_WIDTH) * ctx.canvas.width / w,
+                        (py + BORDER_WIDTH + (1 - 2 * BORDER_WIDTH) * (1 - health)) * ctx.canvas.height / h,
+                        (1 - 2 * BORDER_WIDTH) * ctx.canvas.width / w,
+                        (1 - 2 * BORDER_WIDTH) * health * ctx.canvas.height / h
                     );
                 } else {
-                    var cx = (px + 0.5) * 500 / w;
-                    var cy = (py + 0.5) * 500 / h;
-                    var radius = 0.3 * 500 / w;
+                    var cx = (px + 0.5) * ctx.canvas.width / w;
+                    var cy = (py + 0.5) * ctx.canvas.height / h;
+                    var radius = 0.3 * ctx.canvas.width / w;
 
                     let lineWidthMultiplier = 20 / w;
                     ctx.beginPath();
@@ -554,21 +564,21 @@ function visualize(data) {
                     ctx.lineWidth = 5;
                     ctx.beginPath();
                     ctx.moveTo(
-                        (interPos1.x + 0.5) * 500 / w,
-                        (interPos1.y + 0.5) * 500 / h);
+                        (interPos1.x + 0.5) * ctx.canvas.width / w,
+                        (interPos1.y + 0.5) * ctx.canvas.height / h);
                     ctx.lineTo(
-                        (interPos2.x + 0.5) * 500 / w,
-                        (interPos2.y + 0.5) * 500 / h);
+                        (interPos2.x + 0.5) * ctx.canvas.width / w,
+                        (interPos2.y + 0.5) * ctx.canvas.height / h);
                     ctx.stroke();
 
                     if (attackTime > DamageTime && attackTime < DamageTime + 0.1) {
                         let size = (attackTime - DamageTime)/0.1;
                         ctx.beginPath();
                         ctx.arc(
-                            (tpos.x + 0.5) * 500 / w,
-                            (tpos.y + 0.5) * 500 / h,
-                            size * HEAD_SIZE * 500 / w,
-                            // size * HEAD_SIZE * 500 / h,
+                            (tpos.x + 0.5) * ctx.canvas.width / w,
+                            (tpos.y + 0.5) * ctx.canvas.height / h,
+                            size * HEAD_SIZE * ctx.canvas.width / w,
+                            // size * HEAD_SIZE * ctx.canvas.height / h,
                             0,
                             2 * Math.PI
                         );
@@ -595,8 +605,8 @@ function visualize(data) {
                             let offset = 0.05 * Math.sin(tx * 30);
                             p.x += normal.x * offset;
                             p.y += normal.y * offset;
-                            if (i == 0) ctx.moveTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
-                            else ctx.lineTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
+                            if (i == 0) ctx.moveTo((p.x + 0.5) * ctx.canvas.width / w, (p.y + 0.5) * ctx.canvas.height / h);
+                            else ctx.lineTo((p.x + 0.5) * ctx.canvas.width / w, (p.y + 0.5) * ctx.canvas.height / h);
                         }
 
                         ctx.stroke();
@@ -604,8 +614,8 @@ function visualize(data) {
                         let effectEnd = 0.9;
                         let effectStart = 0.1;
                         if (attackTime > 0.1 && attackTime < 0.9) {
-                            let tposx = (tpos.x + 0.5) * 500 / w;
-                            let tposy = (tpos.y + 0.5) * 500 / h;
+                            let tposx = (tpos.x + 0.5) * ctx.canvas.width / w;
+                            let tposy = (tpos.y + 0.5) * ctx.canvas.height / h;
                             ctx.beginPath();
                             let lines = 9;
                             let innerRadius = 0.5;
@@ -613,8 +623,10 @@ function visualize(data) {
                             let angleOffset = attackTime * 0.5 * Math.PI;
                             for (let i = 0; i < 9; i++) {
                                 let angle = (i / lines) * 2 * Math.PI;
-                                ctx.moveTo(tposx + innerRadius * Math.cos(angle + angleOffset) * (500 / w), tposy + innerRadius * Math.sin(angle + angleOffset) * (500 / w));
-                                ctx.lineTo(tposx + outerRadius * Math.cos(angle + angleOffset) * (500 / w), tposy + outerRadius * Math.sin(angle + angleOffset) * (500 / w));
+                                ctx.moveTo(tposx + innerRadius * Math.cos(angle + angleOffset) * (ctx.canvas.width / w),
+                                           tposy + innerRadius * Math.sin(angle + angleOffset) * (ctx.canvas.height / h));
+                                ctx.lineTo(tposx + outerRadius * Math.cos(angle + angleOffset) * (ctx.canvas.width / w),
+                                           tposy + outerRadius * Math.sin(angle + angleOffset) * (ctx.canvas.height / h));
                             }
                             ctx.strokeStyle = "#12e5ca";
                             ctx.lineWidth = 2;
@@ -640,8 +652,8 @@ function visualize(data) {
                             let offset = 0.05 * Math.sin(tx * 30);
                             p.x += normal.x * offset;
                             p.y += normal.y * offset;
-                            if (i == 0) ctx.moveTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
-                            else ctx.lineTo((p.x + 0.5) * 500 / w, (p.y + 0.5) * 500 / h);
+                            if (i == 0) ctx.moveTo((p.x + 0.5) * ctx.canvas.width / w, (p.y + 0.5) * ctx.canvas.height / h);
+                            else ctx.lineTo((p.x + 0.5) * ctx.canvas.width / w, (p.y + 0.5) * ctx.canvas.height / h);
                         }
 
                         ctx.stroke();
@@ -650,10 +662,10 @@ function visualize(data) {
                             let size = (attackTime - DamageTime)/0.1;
                             ctx.beginPath();
                             ctx.arc(
-                                (tpos.x + 0.5) * 500 / w,
-                                (tpos.y + 0.5) * 500 / h,
-                                size * HEAD_SIZE * 500 / w,
-                                // size * HEAD_SIZE * 500 / h,
+                                (tpos.x + 0.5) * ctx.canvas.width / w,
+                                (tpos.y + 0.5) * ctx.canvas.height / h,
+                                size * HEAD_SIZE * ctx.canvas.width / w,
+                                // size * HEAD_SIZE * ctx.canvas.height / h,
                                 0,
                                 2 * Math.PI
                             );
@@ -670,21 +682,21 @@ function visualize(data) {
                     ctx.lineWidth = 5;
                     ctx.beginPath();
                     ctx.moveTo(
-                        (interPos1.x + 0.5) * 500 / w,
-                        (interPos1.y + 0.5) * 500 / h);
+                        (interPos1.x + 0.5) * ctx.canvas.width / w,
+                        (interPos1.y + 0.5) * ctx.canvas.height / h);
                     ctx.lineTo(
-                        (interPos2.x + 0.5) * 500 / w,
-                        (interPos2.y + 0.5) * 500 / h);
+                        (interPos2.x + 0.5) * ctx.canvas.width / w,
+                        (interPos2.y + 0.5) * ctx.canvas.height / h);
                     ctx.stroke();
 
                     if (attackTime > DamageTime && attackTime < DamageTime + 0.1) {
                         let size = (attackTime - DamageTime)/0.1;
                         ctx.beginPath();
                         ctx.arc(
-                            (tpos.x + 0.5) * 500 / w,
-                            (tpos.y + 0.5) * 500 / h,
-                            size * HEAD_SIZE * 500 / w,
-                            // size * HEAD_SIZE * 500 / h,
+                            (tpos.x + 0.5) * ctx.canvas.width / w,
+                            (tpos.y + 0.5) * ctx.canvas.height / h,
+                            size * HEAD_SIZE * ctx.canvas.width / w,
+                            // size * HEAD_SIZE * ctx.canvas.height / h,
                             0,
                             2 * Math.PI
                         );
@@ -699,21 +711,21 @@ function visualize(data) {
                     ctx.lineWidth = 5;
                     ctx.beginPath();
                     ctx.moveTo(
-                        (interPos1.x + 0.5) * 500 / w,
-                        (interPos1.y + 0.5) * 500 / h);
+                        (interPos1.x + 0.5) * ctx.canvas.width / w,
+                        (interPos1.y + 0.5) * ctx.canvas.height / h);
                     ctx.lineTo(
-                        (interPos2.x + 0.5) * 500 / w,
-                        (interPos2.y + 0.5) * 500 / h);
+                        (interPos2.x + 0.5) * ctx.canvas.width / w,
+                        (interPos2.y + 0.5) * ctx.canvas.height / h);
                     ctx.stroke();
 
                     if (attackTime > DamageTime && attackTime < DamageTime + 0.1) {
                         let size = (attackTime - DamageTime)/0.1;
                         ctx.beginPath();
                         ctx.arc(
-                            (tpos.x + 0.5) * 500 / w,
-                            (tpos.y + 0.5) * 500 / h,
-                            size * HEAD_SIZE * 500 / w,
-                            // size * HEAD_SIZE * 500 / h,
+                            (tpos.x + 0.5) * ctx.canvas.width / w,
+                            (tpos.y + 0.5) * ctx.canvas.height / h,
+                            size * HEAD_SIZE * ctx.canvas.width / w,
+                            // size * HEAD_SIZE * ctx.canvas.height / h,
                             0,
                             2 * Math.PI
                         );
@@ -729,11 +741,11 @@ function visualize(data) {
                                 ctx.lineWidth = 5;
                                 ctx.beginPath();
                                 ctx.moveTo(
-                                    (tpos.x + 0.5) * 500 / w,
-                                    (tpos.y + 0.5) * 500 / h);
+                                    (tpos.x + 0.5) * ctx.canvas.width / w,
+                                    (tpos.y + 0.5) * ctx.canvas.height / h);
                                 ctx.lineTo(
-                                    (tpos.x + 0.5 + dx) * 500 / w,
-                                    (tpos.y + 0.5 + dy) * 500 / h);
+                                    (tpos.x + 0.5 + dx) * ctx.canvas.width / w,
+                                    (tpos.y + 0.5 + dy) * ctx.canvas.height / h);
                                 ctx.stroke();
                             }
                         }

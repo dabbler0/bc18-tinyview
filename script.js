@@ -28,6 +28,13 @@ for (let i = 0; i < UNIT_CLASSES.length; i++) {
     classIcons[UNIT_CLASSES[i]] = img;
 }
 
+let rocketIcons = [null, null];
+for (let i = 0; i < 2; i++) {
+    let img = new Image();
+    img.src = "images/RocketInSpace" + TEAMS[i] + ".svg";
+    rocketIcons[i] = img;
+}
+
 
 // Set default timeout value
 document.getElementById('timeout').value = timeout;
@@ -125,35 +132,36 @@ function visualize(data) {
 
     // Parse each turn from the replay file
     data = data['message'].map(JSON.parse);
+    
+    // Pop off the first "turn", whic is not a turn
+    // but instead an initialization object
+    let world = data[0].world;
+    data.shift();
 
     // Clear info on the winner
     document.getElementById('winner').innerText = '';
 
     // Get impassable squares for Earth
     var planet_maps = {
-        'Earth': data[0].world.planet_maps.Earth.is_passable_terrain,
-        'Mars': data[0].world.planet_maps.Mars.is_passable_terrain
+        'Earth': world.planet_maps.Earth.is_passable_terrain,
+        'Mars': world.planet_maps.Mars.is_passable_terrain
     };
 
     // Get Karbonite data
     // We'll precomp this for every turn
     var karbonite_maps = {
-        'Earth': [data[0].world.planet_maps.Earth.initial_karbonite],
+        'Earth': [world.planet_maps.Earth.initial_karbonite],
         'Mars': [planet_maps['Mars'].map(function(x) { return x.map(function() { return 0; }); })]
     };
 
     // Get the team identities of the initial units
     // (these are not given ever again so we need to remember)
-    var initial_units = data[0].world.planet_states.Earth.units
+    var initial_units = world.planet_states.Earth.units
     for (var key in initial_units) {
         var unit = initial_units[key];
         id2team[unit.id] = unit.team;
         id2teamIndex[unit.id] = TEAMS.indexOf(unit.team);
     }
-
-    // Pop off the first "turn", whic is not a turn
-    // but instead an initialization object
-    data.shift();
 
     // We will now precomp Karbonite data,
     // reserves data, and unit teams, to allow
@@ -250,6 +258,156 @@ function visualize(data) {
     var earth_w = planet_maps['Earth'][0].length, earth_h = planet_maps['Earth'].length;
     // Convenience dimension variables
     var mars_w = planet_maps['Mars'][0].length, mars_h = planet_maps['Mars'].length;
+
+    let researchEvents = [[], []];
+    for (let t = 0; t < data.length; t++) {
+        let eventBuffer = researchEvents[t % 2];
+
+        let changes = data[t].additional_changes;
+        for (let i = 0; i < changes.length; i++) {
+            if ("ResearchComplete" in changes[i]) {
+                let item = changes[i]["ResearchComplete"];
+                let buffer = eventBuffer;
+
+                // This is currently bugged in the engine
+                // Awaiting engine fix
+                if ("team" in item) {
+                    // Yay! The Engine has been fixed
+                    buffer = researchEvents[TEAMS.indexOf(item.team)];
+                }
+
+                for (let j = 0; j < buffer.length; j++) {
+                    if (buffer[j].end_turn == -1) {
+                        if (buffer[j].branch != item.branch) {
+                            console.log("Incorrect research was completed. Expected " + buffer[j].branch + " but got " + item.branch + ". This error will be removed once a bug in the battlecode engine is patched");
+                            break;
+                        }
+                        buffer[j].end_turn = t;
+
+                        // Start next research
+                        for (let q = 0; q < buffer.length; q++) {
+                            if (buffer[q].start_active_turn == -1 && !buffer[q].cancelled) {
+                                buffer[q].start_active_turn = t;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        changes = data[t].changes;
+        for (let i = 0; i < changes.length; i++) {
+            if (changes[i] == "ResetResearchQueue") {
+                for (let j = 0; j < eventBuffer.length; j++) {
+                    if (eventBuffer[j].end_turn == -1) {
+                        eventBuffer[j].cancelled = true;
+                        eventBuffer[j].end_turn = t;
+                    }
+                }
+            } else if ("QueueResearch" in changes[i]) {
+                let item = changes[i]["QueueResearch"];
+                let anyActive = false;
+                for (let j = 0; j < eventBuffer.length; j++) {
+                    // Active!
+                    if (eventBuffer[j].end_turn == -1) {
+                        anyActive = true;
+                    }
+                }
+                eventBuffer.push({
+                    branch: item.branch,
+                    start_turn: t,
+                    end_turn: -1,
+                    start_active_turn: anyActive ? -1 : t,
+                    cancelled: false,
+                });
+            }
+        }
+    }
+
+    // Note: may have to be updated if any balancing changes are done
+    const RocketResearchTravelTimeReduction = 80;
+
+    let rockets = [];
+    for (let t = 0; t < data.length; t++) {
+        let changes = data[t].changes;
+        for (let i = 0; i < changes.length; i++) {
+            let launch = changes[i].LaunchRocket;
+            if (launch !== undefined) {
+                let rocket = {
+                    unitId: launch.rocket_id,
+                    startTurn: t,
+                    endTurn: t + 4*travel_time(t, world.orbit) + 1 - (has_research(t, "Rocket", 2, t % 2) ? RocketResearchTravelTimeReduction : 0),
+                    teamIndex: t % 2,
+                    location: launch.location,
+                };
+                rockets.push(rocket);
+
+                if (rocket.endTurn < data.length) {
+                    let expectedLandingChanges = data[rocket.endTurn].additional_changes;
+                    let found = false;
+                    for (let j = 0; j < expectedLandingChanges.length; j++) {
+                        var landing = expectedLandingChanges[j].RocketLanding;
+                        if (landing !== undefined && landing.rocket_id == launch.rocket_id) {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    // Note: a bug was recently fixed in the engine that caused rocket research to increase the travel time instead of reduce it, that bug can cause this message to be logged.
+                    if (!found) {
+                        console.log("Didn't find rocket landing, start at " + rocket.startTurn + " expected landing at " + rocket.endTurn);
+                    }
+                } else if (rocket.endTurn/4 < 1000) {
+                    console.log("Rocket should land after the game end, but before turn 1000, how is this possible?");
+                }
+            }
+        }
+    }
+
+    function travel_time_smooth(time, orbit) {
+        return orbit.center + orbit.amplitude * Math.sin((time/4+1) * (2*Math.PI / orbit.period));
+    }
+
+    function travel_time(time, orbit) {
+        // Note |0 is used to round towards zero, in contrast to floor which rounds towards negative infinity
+        return orbit.center + ((orbit.amplitude * Math.sin(Math.floor(time/4+1) * (2*Math.PI / orbit.period)))|0);
+    }
+
+    function has_research(time, research, level, teamIndex) {
+        let lev = 0;
+        for (let i = 0; i < researchEvents[teamIndex].length; i++) {
+            let item = researchEvents[teamIndex][i];
+            if (item.branch == research && !item.cancelled && time >= item.end_turn && item.end_turn != -1) lev++;
+        }
+        return lev >= level;
+    }
+
+    function test_duration() {
+        let period = 200;
+        let orbit = {
+            amplitude: 150,
+            period: period,
+            center: 250,
+        };
+        function duration(round, orbit) {
+            return Math.round(travel_time(4*round - 4, orbit));
+        }
+        for (let i = 0; i < 5; i++) {
+            let base = period * i;
+            console.assert(250 == duration(base, orbit), 250 + " == " + duration(base, orbit));
+            console.assert(400 == duration(base + period / 4, orbit), 400 + " == " + duration(base + period / 4, orbit));
+            console.assert(250 == duration(base + period / 2, orbit), 250 + " == " + duration(base + period / 2, orbit));
+            console.assert(100 == duration(base + period * 3 / 4, orbit), 100 + " == " + duration(base + period * 3 / 4, orbit));
+            console.assert(250 == duration(base + period, orbit), 250 + " == " + duration(base + period, orbit));
+
+            let dur = duration(base + period / 8, orbit);
+            console.assert(dur > 250 && dur < 400);
+        }
+    }
+
+    test_duration();
 
     function render_planet_background(t, planet, ctx) {
         // Convenience dimension variables
@@ -746,6 +904,50 @@ function visualize(data) {
         }
     }
 
+    function render_rocket_landings(t, ctx, canvas) {
+        // Convenience dimension variables
+        var w = mars_w, h = mars_h;
+
+        // This is used to invert the y-axis
+        function flipY(oy) { return (h - oy - 1); }
+
+        const effectDurations = [4*18, 4*5];
+        const effectOffsets = [4*5, 4*2];
+        const effectRadii = [1.5, 1];
+        for (let i = 0; i < rockets.length; i++) {
+            const rocket = rockets[i];
+            for (let k = 0; k < 2; k++) {
+                const effectDuration = effectDurations[k];
+                const effectOffset = effectOffsets[k];
+                const effectRadius = effectRadii[k];
+                if (t >= rocket.endTurn - effectDuration + effectOffset && t < rocket.endTurn + effectOffset) {
+                    ctx.save();
+                    ctx.translate((rocket.location.x + 0.5) * 500 / mars_w, (flipY(rocket.location.y) + 0.5) * 500 / mars_h);
+                    ctx.fillStyle = "#8b3c0d";
+                
+                    const relativeTime = 1 - (rocket.endTurn + effectOffset - t) / effectDuration;
+                    for (let j = 0; j < 10; j++) {
+                        // const rad = (j+1) * (relativeTime - 1 + 1 / (j + 1));
+                        const rad = Math.pow(j+1, 0.4) * ( relativeTime - (j+1) / 10)
+                        if (rad > 0) {
+                            //const rad2 = Math.pow(j+1, 0.8) * (relativeTime - 1 + 1 / (j + 1));
+                            ctx.beginPath();
+                            ctx.arc(0, 0, rad * effectRadius * (500 / mars_w), 0, 2 * Math.PI);
+                            if (j == 0) {
+                                ctx.globalCompositeOperation = "multiply";
+                            } else {
+                                ctx.globalCompositeOperation = "lighter";
+                            }
+                            ctx.globalAlpha = clamp01(2*(1 - Math.pow(relativeTime, 0.5)));
+                            ctx.fill();
+                        }
+                    }
+                    ctx.restore();
+                }
+            }
+        }
+    }
+
     // Now, to render an animation frame:
     function render_planet(t, fractional_t, planet, ctx, canvas, unit_count) {
         // Convenience dimension variables
@@ -757,6 +959,7 @@ function visualize(data) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         render_planet_background(t, planet, ctx);
+        render_rocket_landings(t + fractional_t, ctx, canvas);
 
         // Render units
         var unit_locations = {};
@@ -818,80 +1021,6 @@ function visualize(data) {
         }
 
         ctx.restore();
-    }
-
-    function render_graphs(time, ctx) {
-        let width = ctx.canvas.width;
-        render_graph(ctx, reserves, 0, 100, 300, 150, ["rgba(55,126,184, 0.8)", "rgba(228,26,28, 0.8)"]); // Reserves are reversed colors for whatever reason
-        render_graph(ctx, unitValueByTime, width/2 - 300/2, 100, 300, 150);
-        render_graph(ctx, [0,1,0,1,0,1], width - 300, 100, 300, 150);
-    }
-
-    let researchEvents = [[], []];
-    for (let t = 0; t < data.length; t++) {
-        let eventBuffer = researchEvents[t % 2];
-
-        let changes = data[t].additional_changes;
-        for (let i = 0; i < changes.length; i++) {
-            if ("ResearchComplete" in changes[i]) {
-                let item = changes[i]["ResearchComplete"];
-                let buffer = eventBuffer;
-
-                // This is currently bugged in the engine
-                // Awaiting engine fix
-                if ("team" in item) {
-                    // Yay! The Engine has been fixed
-                    buffer = researchEvents[TEAMS.indexOf(item.team)];
-                }
-
-                for (let j = 0; j < buffer.length; j++) {
-                    if (buffer[j].end_turn == -1) {
-                        if (buffer[j].branch != item.branch) {
-                            console.log("Incorrect research was completed. Expected " + buffer[j].branch + " but got " + item.branch + ". This error will be removed once a bug in the battlecode engine is patched");
-                            break;
-                        }
-                        buffer[j].end_turn = t;
-
-                        // Start next research
-                        for (let q = 0; q < buffer.length; q++) {
-                            if (buffer[q].start_active_turn == -1 && !buffer[q].cancelled) {
-                                buffer[q].start_active_turn = t;
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-
-        changes = data[t].changes;
-        for (let i = 0; i < changes.length; i++) {
-            if (changes[i] == "ResetResearchQueue") {
-                for (let j = 0; j < eventBuffer.length; j++) {
-                    if (eventBuffer[j].end_turn == -1) {
-                        eventBuffer[j].cancelled = true;
-                        eventBuffer[j].end_turn = t;
-                    }
-                }
-            } else if ("QueueResearch" in changes[i]) {
-                let item = changes[i]["QueueResearch"];
-                let anyActive = false;
-                for (let j = 0; j < eventBuffer.length; j++) {
-                    // Active!
-                    if (eventBuffer[j].end_turn == -1) {
-                        anyActive = true;
-                    }
-                }
-                eventBuffer.push({
-                    branch: item.branch,
-                    start_turn: t,
-                    end_turn: -1,
-                    start_active_turn: anyActive ? -1 : t,
-                    cancelled: false,
-                });
-            }
-        }
     }
 
     let TeamResearchColors = ["#e41a1c", "#377eb8"];
@@ -972,6 +1101,102 @@ function visualize(data) {
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         render_research_team(time, ctx, 0, researchEvents[0], 118, UIdt);
         render_research_team(time, ctx, 1, researchEvents[1], 118 + 90, UIdt);
+    }
+
+    
+
+    function render_space_travel(time, ctx) {
+        let max_travel = world.orbit.center + world.orbit.amplitude;
+        let min_travel = world.orbit.center - world.orbit.amplitude;
+
+        const marsFactor = 0.75;
+        const earthFactor = 0.1;
+        let planetEarthX = travel_time_smooth(time, world.orbit) * (earthFactor - marsFactor) / max_travel + marsFactor;
+        let planetMarsX = marsFactor;
+
+        planetEarthX *= ctx.canvas.width;
+        planetMarsX *= ctx.canvas.width;
+        let y = 50;
+        let planetRadius = 20;
+
+        ctx.save();
+        ctx.fillStyle = "#377eb8";
+        ctx.strokeStyle = "#2a618d";
+        ctx.beginPath();
+        ctx.arc(planetEarthX - planetRadius, y, planetRadius, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#cb6430";
+        ctx.strokeStyle = "#39000c";
+        ctx.beginPath();
+        ctx.arc(planetMarsX + planetRadius, y, planetRadius, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+
+        for (let i = 0; i < rockets.length; i++) {
+            const rocket = rockets[i];
+            const fadeoutTime = 10;
+            if (time > rocket.startTurn && time < rocket.endTurn + fadeoutTime) {
+                let fractionCompleted = (time - rocket.startTurn) / (rocket.endTurn - rocket.startTurn);
+                fractionCompleted = clamp01(fractionCompleted);
+
+                // Remap to make the rocket slow down slightly at the end of the path
+                const slowdown = 0.1;
+                fractionCompleted = (fractionCompleted - slowdown*Math.pow(fractionCompleted, 1 / slowdown)) / (1 - slowdown);
+
+                let maxYOffset = 20;
+                if (rocket.teamIndex == 1) maxYOffset *= -1;
+                const yOffset = maxYOffset * 4*fractionCompleted*(1-fractionCompleted);
+                const travelDistanceInPixels = travel_time(rocket.startTurn, world.orbit)/max_travel * ctx.canvas.width * (marsFactor - earthFactor);
+                const distanceFromMarsInPixels = (1 - fractionCompleted) * travelDistanceInPixels;
+                const yVelocity = (maxYOffset * 4 * (1 - 2*fractionCompleted));
+                const xVelocity = travelDistanceInPixels;
+
+                let angle = Math.atan2(yVelocity, xVelocity);
+
+                let img = rocketIcons[rocket.teamIndex];
+                let iconW = 30;
+                let iconH = 30;
+
+                angle += Math.PI * (Math.tanh(30*(fractionCompleted - 0.8))+1)/2;
+                ctx.save();
+                ctx.translate(planetMarsX - distanceFromMarsInPixels, y + yOffset);
+                ctx.rotate(angle);
+                ctx.globalAlpha = clamp01(1 - (time - rocket.endTurn)/fadeoutTime);
+                ctx.shadowBlur = 3;
+                ctx.shadowColor = "#FFF";
+                ctx.drawImage(img, -iconW/2, -iconH/2, iconW, iconH);
+                ctx.restore();
+            }
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(planetMarsX, 20);
+        ctx.lineTo(planetEarthX, 20);
+        ctx.setLineDash([5,5]);
+        ctx.strokeStyle = "#CCC";
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#CCC";
+        ctx.strokeStyle = "#FFF";
+        ctx.lineWidth = 10;
+        ctx.font = '14px Roboto';
+        ctx.strokeText("" + travel_time(time, world.orbit), (planetMarsX + planetEarthX)/2, 20 + 1);
+        ctx.fillText("" + travel_time(time, world.orbit), (planetMarsX + planetEarthX)/2, 20 + 1);
+        ctx.restore();
+    }
+
+    function render_graphs(time, ctx) {
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        let width = ctx.canvas.width;
+        render_graph(ctx, reserves, 0, 100, 300, 150, ["rgba(55,126,184, 0.8)", "rgba(228,26,28, 0.8)"]); // Reserves are reversed colors for whatever reason
+        render_graph(ctx, unitValueByTime, width/2 - 300/2, 100, 300, 150);
+        render_graph(ctx, [0,1,0,1,0,1], width - 300, 100, 300, 150);
+        render_space_travel(time, ctx);
     }
 
     let lastTime = performance.now() * 0.001;

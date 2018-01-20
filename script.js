@@ -1157,7 +1157,7 @@ function visualize(data) {
 
                 let img = rocketIcons[rocket.teamIndex];
                 let iconW = 30;
-                let iconH = 30;
+                let iconH = iconW * img.height / img.width;
 
                 angle += Math.PI * (Math.tanh(30*(fractionCompleted - 0.8))+1)/2;
                 ctx.save();

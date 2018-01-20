@@ -959,7 +959,7 @@ function visualize(data) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         render_planet_background(t, planet, ctx);
-        render_rocket_landings(t + fractional_t, ctx, canvas);
+        if (planet == "Mars") render_rocket_landings(t + fractional_t, ctx, canvas);
 
         // Render units
         var unit_locations = {};

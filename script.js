@@ -1045,8 +1045,8 @@ function visualize(data) {
 
         // Render Karbonite reserves and turn number
         document.getElementById('turn').innerText = document.getElementById('turnslider').value.toString();
-        document.getElementById('blue_karbonite').innerText = reserves[ti][0].toString();
-        document.getElementById('red_karbonite').innerText = reserves[ti][1].toString();
+        document.getElementById('red_karbonite').innerText = reserves[ti][0].toString();
+        document.getElementById('blue_karbonite').innerText = reserves[ti][1].toString();
 
         // Render unit count for each team
         for (var i = 0, team; team = TEAMS[i]; i++) {

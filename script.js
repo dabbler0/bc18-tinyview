@@ -1404,6 +1404,42 @@ document.getElementById('ffile').addEventListener('change', function(e) {
     }
 });
 
+function getParameterByName(name, url) {
+    if (!url) url = window.location.href;
+    name = name.replace(/[\[\]]/g, "\\$&");
+    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, " "));
+}
+
+let decodedURL = decodeURIComponent(getParameterByName("replay"));
+if (decodedURL.length > 0) {
+    // Send amazon requests through a proxy because of CORS.
+    // Ideally we should get Teh Devs to set the proper CORS flags.
+    // For now here is a proxy server that can be used.
+    decodedURL = decodedURL.replace("https://s3.amazonaws.com", "http://arongranberg.com:6001");
+    decodedURL = decodedURL.replace("http://s3.amazonaws.com", "http://arongranberg.com:6001");
+    var xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+        console.log(this.response.length);
+        var array = new Uint8Array(this.response);
+
+        try {
+            // Parse replay file
+            var data = JSON.parse(pako.inflate(array, {to: 'string'}));
+            visualize(data);
+        } catch (err) {
+            alert('Could not decompress gzipped .bc18z file.');
+            console.log(err);
+        }
+    }
+    xhr.open("GET", decodedURL, true);
+    xhr.responseType = "arraybuffer";
+    xhr.send();
+}
+
 // Trigger if local path provided in url
 var regex = new RegExp("[?&]fname(=([^&#]*)|&|#|$)");
 var results = regex.exec(window.location.href);

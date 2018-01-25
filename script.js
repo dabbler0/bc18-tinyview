@@ -1365,44 +1365,77 @@ document.getElementById('ffile').addEventListener('change', function(e) {
 
     // Is the file gzipped?
     if (file.name.indexOf('.bc18z') !== -1) {
-        // Read the contents of the file
-        var reader = new FileReader();
-
-        // FileReader loads -- callback:
-        reader.onload = function(e) {
-            var array = new Uint8Array(reader.result);
-
-            try {
-                // Parse replay file
-                var data = JSON.parse(pako.inflate(array, {to: 'string'}));
-
-                visualize(data);
-            }
-            catch (err) {
-                alert('Could not decompress gzipped .bc18z file.');
-            }
-
-        }
-
-        reader.readAsArrayBuffer(file);
+       handleGzippedReplay(file);
+    }
+    else if (file.name.indexOf('.bc18') !== -1){
+       handleUnzippedReplay(file,false);
     }
     else {
-        // Read the contents of the file
-        var reader = new FileReader();
+       handleUnzippedReplay(file,true);
+    }
+});
 
-        // FileReader loads -- callback:
-        reader.onload = function(e) {
-            var txt = reader.result;
+function handleGzippedReplay(file){
+    console.log('Handling gzipped replay');
+    var reader = new FileReader();
 
+    // FileReader loads -- callback:
+    reader.onload = function(e) {
+        var array = new Uint8Array(reader.result);
+
+        try {
             // Parse replay file
+            var data = JSON.parse(pako.inflate(array, {to: 'string'}));
+
+            visualize(data);
+        }
+        catch (err) {
+            alert('Could not decompress gzipped .bc18z file.');
+        }
+
+    }
+
+    reader.readAsArrayBuffer(file);
+}
+
+function handleUnzippedReplay(file,ambiguous_zipped_status){
+    console.log("Handling unzipped replay with ambiguous_zipped_status = "+ambiguous_zipped_status);
+
+    // Read the contents of the file
+    var reader = new FileReader();
+
+    // FileReader loads -- callback:
+    reader.onload = function(e) {
+        var txt = reader.result;
+        if (ambiguous_zipped_status){
+           //If we are unsure as to whether this file is zipped or not:
+
+           try {
+               //Attempt to parse it as unzipped              
+               var data = JSON.parse(txt);
+
+               visualize(data);
+            }
+            catch(err) {
+                //If this fails, parse it as zipped
+
+                console.log("Ambiguous file fails to parse as straight json, passing to handleGzippedReplay");
+                handleGzippedReplay(file);
+            }
+
+        } else {
+
+            //We are certain this file is unzipped
             var data = JSON.parse(txt);
 
             visualize(data);
         }
 
-        reader.readAsText(file);
     }
-});
+
+    reader.readAsText(file);
+}
+
 
 // Trigger if local path provided in url
 var regex = new RegExp("[?&]fname(=([^&#]*)|&|#|$)");

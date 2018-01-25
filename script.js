@@ -232,13 +232,13 @@ function visualize(data) {
 
     // Note: need to keep up to date
     let unit_values = {
-        "Worker": 25,
-        "Knight": 20,
-        "Ranger": 20,
-        "Mage": 20,
-        "Healer": 20,
-        "Rocket": 75,
-        "Factory": 100,
+        "Worker": 50,
+        "Knight": 40,
+        "Ranger": 40,
+        "Mage": 40,
+        "Healer": 40,
+        "Rocket": 150,
+        "Factory": 200,
     };
 
     for (var t = 0; t < data.length; t += 1) {

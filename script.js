@@ -989,7 +989,7 @@ function visualize(data) {
         render_attacks(t, fractional_t, planet, ctx, unit_locations, unit_types, prevUnits);
     }
 
-    function render_graph(ctx, values, x, y, w, h, colors) {
+    function render_graph(ctx, label, values, time, x, y, w, h, colors) {
         ctx.save();
 
         ctx.beginPath();
@@ -1032,6 +1032,17 @@ function visualize(data) {
             ctx.stroke();
         }
 
+        ctx.beginPath();
+        ctx.moveTo(remapx(time / values.length), y);
+        ctx.lineTo(remapx(time / values.length), y + h);
+        ctx.strokeStyle = "rgba(255,255,255,0.8)";
+        ctx.stroke();
+
+        ctx.textBaseline = "top";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#FFF";
+        ctx.font = '1.2em Roboto';
+        ctx.fillText("" + label, x + w/2, y + 12);
         ctx.restore();
     }
 
@@ -1205,9 +1216,8 @@ function visualize(data) {
     function render_graphs(time, ctx) {
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         let width = ctx.canvas.width;
-        render_graph(ctx, reserves, 0, 100, 300, 150, ["rgba(55,126,184, 0.8)", "rgba(228,26,28, 0.8)"]); // Reserves are reversed colors for whatever reason
-        render_graph(ctx, unitValueByTime, width/2 - 300/2, 100, 300, 150);
-        render_graph(ctx, [0,1,0,1,0,1], width - 300, 100, 300, 150);
+        render_graph(ctx, "Karbonite", reserves, time, 0, 100, 490, 150);
+        render_graph(ctx, "Total unit value", unitValueByTime, time, width - 490, 100, 490, 150);
         render_space_travel(time, ctx);
     }
 

@@ -21,6 +21,18 @@ var mars_ctx = mars_canvas.getContext('2d');
 var timeout = 40;
 var activeID = 0;
 
+const turnsliderElement = document.getElementById('turnslider');
+const turnElement = document.getElementById('turn');
+const teamUnitCountElements = [];
+
+for (var i = 0, team; team = TEAMS[i]; i++) {
+    let v = [];
+    for (var j = 0, unit_class; unit_class = UNIT_CLASSES[j]; j++) {
+        v.push(document.getElementById('info' + team + unit_class));
+    }
+    teamUnitCountElements.push(v);
+}
+
 var classIcons = {};
 for (let i = 0; i < UNIT_CLASSES.length; i++) {
     let img = new Image();
@@ -37,12 +49,32 @@ for (let i = 0; i < 2; i++) {
 
 
 // Set default timeout value
-document.getElementById('timeout').value = timeout;
+document.getElementById('timeout').value = getTPS();
 
 // Allow setting replay speed
 document.getElementById('timeout').addEventListener('change', function(e) {
-    timeout = document.getElementById('timeout').value;
+    setTPS(document.getElementById('timeout').value);
 });
+
+// Set ticks per second
+function setTPSExternal(tps) {
+    setTPS(tps);
+    document.getElementById('timeout').value = tps;
+}
+
+function setTPS(tps) {
+    if (tps == 0) return;
+    timeout = 1000 / tps;
+}
+
+function getTPS() {
+    if (timeout === 0) return 0;
+    return 1000 / timeout;
+}
+
+if (location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "") {
+    document.getElementById("fname").style.display = "inline-block";
+}
 
 /*
 Visualize a replay file given a JSON object
@@ -252,7 +284,7 @@ function visualize(data) {
 
     // set the maximum turn we could slide to
     var t = data.length - 1;
-    document.getElementById('turnslider').max = (t - t % 4) / 4 + 1;
+    turnsliderElement.max = (t - t % 4) / 4 + 1;
 
     // Convenience dimension variables
     var earth_w = planet_maps['Earth'][0].length, earth_h = planet_maps['Earth'].length;
@@ -1144,14 +1176,14 @@ function visualize(data) {
 
         ctx.save();
         ctx.fillStyle = "#377eb8";
-        ctx.strokeStyle = "#2a618d";
+        ctx.strokeStyle = "#0065b8";
         ctx.beginPath();
         ctx.arc(planetEarthX - planetRadius, y, planetRadius, 0, 2 * Math.PI);
         ctx.fill();
         ctx.stroke();
 
         ctx.fillStyle = "#cb6430";
-        ctx.strokeStyle = "#39000c";
+        ctx.strokeStyle = "#cb4400";
         ctx.beginPath();
         ctx.arc(planetMarsX + planetRadius, y, planetRadius, 0, 2 * Math.PI);
         ctx.fill();
@@ -1179,7 +1211,7 @@ function visualize(data) {
                 let angle = Math.atan2(yVelocity, xVelocity);
 
                 let img = rocketIcons[rocket.teamIndex];
-                let iconW = 30;
+                let iconW = 40;
                 let iconH = iconW * img.height / img.width;
 
                 angle += Math.PI * (Math.tanh(30*(fractionCompleted - 0.8))+1)/2;
@@ -1188,7 +1220,7 @@ function visualize(data) {
                 ctx.rotate(angle);
                 ctx.globalAlpha = clamp01(1 - (time - rocket.endTurn)/fadeoutTime);
                 ctx.shadowBlur = 3;
-                ctx.shadowColor = "#FFF";
+                ctx.shadowColor = "#000";
                 ctx.drawImage(img, -iconW/2, -iconH/2, iconW, iconH);
                 ctx.restore();
             }
@@ -1205,7 +1237,7 @@ function visualize(data) {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = "#CCC";
-        ctx.strokeStyle = "#FFF";
+        ctx.strokeStyle = "#222";
         ctx.lineWidth = 10;
         ctx.font = '14px Roboto';
         ctx.strokeText("" + travel_time(time, world.orbit), (planetMarsX + planetEarthX)/2, 20 + 1);
@@ -1244,9 +1276,7 @@ function visualize(data) {
             // Make UI progress very quickly to reach the final state in their animations
             UIdt = 10;
         }
-        if (timeout > 0) {
-            realtime += dt * 1/(timeout * 0.001);
-        }
+        realtime += dt * 1/(timeout * 0.001);
         if (reset) {
             realtime = 0;
             reset = false;
@@ -1272,33 +1302,34 @@ function visualize(data) {
         render_graphs(realtime, graph_ctx);
         render_research(realtime, research_ctx, UIdt);
 
+        let turn = (ti - ti % 4) / 4 + 1;
         if (!slider_held) {
             // This sets the value of the slider to the current turn.
             // Note: Turn number should be 1-indexed when displayed.
-            document.getElementById('turnslider').value = (ti - ti % 4) / 4 + 1;
+            turnsliderElement.value = turn;
         }
 
         // Render Karbonite reserves and turn number
-        document.getElementById('turn').innerText = document.getElementById('turnslider').value.toString();
+        turnElement.innerText = turn.toString();
         document.getElementById('red_karbonite').innerText = reserves[ti][0].toString();
         document.getElementById('blue_karbonite').innerText = reserves[ti][1].toString();
 
         // Render unit count for each team
         for (var i = 0, team; team = TEAMS[i]; i++) {
             for (var j = 0, unit_class; unit_class = UNIT_CLASSES[j]; j++) {
-                document.getElementById('info' + team + unit_class)
-                    .innerText = earth_unit_count[team][unit_class] + ' // ' + mars_unit_count[team][unit_class];
+                teamUnitCountElements[i][j].innerText = earth_unit_count[team][unit_class] + ' // ' + mars_unit_count[team][unit_class];
             }
         }
 
         if (ti < data.length - 1) {
-            document.getElementById('winner').innerText = '';
+            // document.getElementById('winner').innerText = '';
         } else {
             // It's the end
             var name = ' (' + team_name[winner] + ')';
             if (!team_name[winner]) name = '';
-            document.getElementById('winner').innerText = winner + name + ' wins!';
-            document.getElementById('winner').style.color = TEAM_COLOR[winner];
+            turnElement.innerText = winner + name + ' wins at turn ' + turn + '!';
+            turnElement.style.color = TEAM_COLOR[winner];
+
         }
 
         // Schedule next animation frame
@@ -1307,39 +1338,92 @@ function visualize(data) {
 
     // A bunch of slider + button event handlers
     // Remove the ones from the previous visualization
-    document.getElementById('turnslider').removeEventListener('input', input_listener);
-    document.getElementById('turnslider').removeEventListener('mousedown', mousedown_listener);
-    document.getElementById('turnslider').removeEventListener('mouseup', mouseup_listener);
+    turnsliderElement.removeEventListener('input', input_listener);
+    turnsliderElement.removeEventListener('mousedown', mousedown_listener);
+    turnsliderElement.removeEventListener('mouseup', mouseup_listener);
 
-    document.getElementById('turnslider').addEventListener('input', input_listener = function(e) {
+    let pause = () => {
+        document.getElementById('pause').style.display='none';
+        document.getElementById('play').style.display='inline-block';
+        paused = true;
+    }
+
+    turnsliderElement.addEventListener('input', input_listener = function(e) {
         // Render the first value of t represented by the given turn
         realtime = (this.value - 1) * 4;
     });
 
-    document.getElementById('turnslider').addEventListener('mousedown', mousedown_listener = function(e) {
+    turnsliderElement.addEventListener('mousedown', mousedown_listener = function(e) {
         slider_held = true;
     });
 
-    document.getElementById('turnslider').addEventListener('mouseup', mouseup_listener = function(e) {
+    turnsliderElement.addEventListener('mouseup', mouseup_listener = function(e) {
         slider_held = false;
+    });
+    
+    document.getElementById('move_to_start').addEventListener('click', function(e) {
+        reset = true;
+    });
+    document.getElementById('move_to_end').addEventListener('click', function(e) {
+        realtime = data.length;
+    });
+
+    const singleStepAnimationSpeed = 3;
+
+    document.getElementById('move_prev').addEventListener('click', function(e) {
+        let targetTime = Math.round(realtime/4)*4 - 4;
+        let prevTime = 0;
+        f = (t) => {
+            if (prevTime === 0) prevTime = t;
+            let dt = t - prevTime;
+            prevTime = t;
+
+            realtime -= singleStepAnimationSpeed*4*0.001*dt;
+            if (realtime <= targetTime) {
+                realtime = targetTime + 0.001;
+            } else {
+                requestAnimationFrame(f);
+            }
+        }
+        pause();
+        requestAnimationFrame(f);
+    });
+
+    document.getElementById('move_next').addEventListener('click', function(e) {
+        let targetTime = Math.round(realtime/4)*4 + 4;
+        let prevTime = 0;
+        f = (t) => {
+            if (prevTime === 0) prevTime = t;
+            let dt = t - prevTime;
+            prevTime = t;
+
+            realtime += singleStepAnimationSpeed*4*0.001*dt;
+            if (realtime >= targetTime) {
+                realtime = targetTime - 0.001;
+            } else {
+                requestAnimationFrame(f);
+            }
+        }
+        pause();
+        requestAnimationFrame(f);
     });
 
     document.getElementById('pause').addEventListener('click', function(e) {
-        paused = !paused;
-        if (paused) this.innerText = 'Resume';
-        else this.innerText = 'Pause';
-    })
-
-    document.getElementById('reset').addEventListener('click', function(e) {
-        reset = true;
-    })
+        pause();
+    });
+    document.getElementById('play').addEventListener('click', function(e) {
+        document.getElementById('pause').style.display='inline-block';
+        document.getElementById('play').style.display='none';
+        paused = false;
+    });
     
     earth_canvas.addEventListener('click', handleLocationClick(earth_canvas, 'EARTH', earth_w, earth_h));
     mars_canvas.addEventListener('click', handleLocationClick(mars_canvas, 'MARS', mars_w, mars_h));
 
     // We're about to render, so let's force unpause.
     paused = false;
-    document.getElementById('pause').innerText = 'Pause';
+    document.getElementById('pause').style.display='inline-block';
+    document.getElementById('play').style.display='none';
 
     window.requestAnimationFrame(render);
 }
@@ -1424,8 +1508,8 @@ function getParameterByName(name, url) {
     return decodeURIComponent(results[2].replace(/\+/g, " "));
 }
 
-let decodedURL = decodeURIComponent(getParameterByName("replay"));
-if (decodedURL.length > 0) {
+let decodedURL = getParameterByName("replay");
+if (decodedURL != null && decodedURL.length > 0) {
     // Send amazon requests through a proxy because of CORS.
     // Ideally we should get Teh Devs to set the proper CORS flags.
     // For now here is a proxy server that can be used.
@@ -1433,7 +1517,6 @@ if (decodedURL.length > 0) {
     decodedURL = decodedURL.replace("http://s3.amazonaws.com", "http://arongranberg.com:6001");
     var xhr = new XMLHttpRequest();
     xhr.onload = function () {
-        console.log(this.response.length);
         var array = new Uint8Array(this.response);
 
         try {

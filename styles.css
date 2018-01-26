@@ -5,12 +5,37 @@ h1 {
     font-family: Inconsolata;
     font-size: 2.5em;
     text-align: center;
+    color: #FFF;
 }
 
 h2 {
     font-family: Roboto;
     font-size: 2em;
     text-align: center;
+}
+
+#turn {
+    font-size: 1em;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    color: #FFF;
+    margin: 0px;
+    margin-bottom: 8px;
+}
+
+body {
+    background: #222;
+    display: -webkit-box;      /* OLD - iOS 6-, Safari 3.1-6 */
+    display: -moz-box;         /* OLD - Firefox 19- (buggy but mostly works) */
+    display: -ms-flexbox;      /* TWEENER - IE 10 */
+    display: -webkit-flex;     /* NEW - Chrome */
+    display: flex;
+    justify-content: center;
+}
+
+#column1 {
+    width: 400px;
+    color: #FFF;
 }
 
 /* this also takes care of canvas centering, how convenient */
@@ -30,26 +55,112 @@ input {
     font-size: 1em;
 }
 
-.viewer {
+#blue_karbonite {
+    border-top-right-radius: 4px;
+}
+
+.controls {
+    display: block;
     margin-left: auto;
     margin-right: auto;
-    width: 1350px;
+    width: 800px;
+    border-radius: 4px;
+}
+
+.speed-controls {
+    display: -webkit-box;      /* OLD - iOS 6-, Safari 3.1-6 */
+    display: -moz-box;         /* OLD - Firefox 19- (buggy but mostly works) */
+    display: -ms-flexbox;      /* TWEENER - IE 10 */
+    display: -webkit-flex;     /* NEW - Chrome */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.controls button, .controls input {
+    -webkit-appearance: none;  /* Override default CSS styles */
+    appearance: none;
+    background: #444;
+    outline: none;
+    border: none;
+    color: #FFF;
+    margin: 0px;
+    padding: 0px;
+    width: 60px;
+    height: 30px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+#move_to_start {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+#move_to_end {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.controls input {
+    width: 100px;
+}
+/* The slider itself */
+#turnslider {
+    -webkit-appearance: none;  /* Override default CSS styles */
+    appearance: none;
+    outline: none; /* Remove outline */
+    width: 90%; /* Full-width */
+    height: 25px; /* Specified height */
+    background: #666; /* Grey background */
+    margin-top: 14px;
+    margin-bottom: 14px;
+    height: 2px;
+    -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+    transition: opacity .2s;
+}
+
+/* Mouse-over effects */
+#turnslider:hover {
+    opacity: 1; /* Fully shown on mouse-over */
+}
+
+#turnslider:focus {
+    outline: none;
+}
+
+/* The slider handle (use -webkit- (Chrome, Opera, Safari, Edge) and -moz- (Firefox) to override default look) */
+#turnslider::-webkit-slider-thumb {
+    -webkit-appearance: none; /* Override default look */
+    appearance: none;
+    width: 10px; /* Set a specific slider handle width */
+    height: 20px; /* Slider handle height */
+    background: #FFF;
+    cursor: pointer; /* Cursor on hover */
+    border-radius: 4px;
+}
+
+#turnslider::-moz-range-thumb {
+    width: 10px; /* Set a specific slider handle width */
+    height: 20px; /* Slider handle height */
+    background: #FFF;
+    cursor: pointer; /* Cursor on hover */
+}
+
+.viewer {
 }
 
 .maps {
     display: inline-block;
-    float: right;
 }
 
 .graphs {
-    float: right;
 }
 
 .info {
     display: inline-block;
     font-weight: bold;
     width: 300px;
-    float: left;
     padding: 10px;
     text-align: left;
 }

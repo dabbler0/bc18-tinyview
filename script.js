@@ -1513,8 +1513,8 @@ if (decodedURL != null && decodedURL.length > 0) {
     // Send amazon requests through a proxy because of CORS.
     // Ideally we should get Teh Devs to set the proper CORS flags.
     // For now here is a proxy server that can be used.
-    decodedURL = decodedURL.replace("https://s3.amazonaws.com", "http://arongranberg.com:6001");
-    decodedURL = decodedURL.replace("http://s3.amazonaws.com", "http://arongranberg.com:6001");
+    decodedURL = decodedURL.replace("https://s3.amazonaws.com", "http://battlecode.arongranberg.com");
+    decodedURL = decodedURL.replace("http://s3.amazonaws.com", "http://battlecode.arongranberg.com");
     var xhr = new XMLHttpRequest();
     xhr.onload = function () {
         var array = new Uint8Array(this.response);

@@ -185,12 +185,17 @@ input {
 .infoRed {
     background: #e41a1c;
     width: 50px;
+    max-width: 50px;
 }
 
 .infoBlue {
     background: #377eb8;
     width: 50px;
+    max-width: 50px;
 }
 
 /* make table a bit more readable */
-th, td { padding: 0px 20px; }
+th, td {
+    padding: 0px 20px;
+    white-space: nowrap;
+}

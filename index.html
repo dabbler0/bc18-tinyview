@@ -1,35 +1,20 @@
 <html>
 <head>
+     <meta charset="UTF-8"> 
     <!-- Here's a simple stylesheet to make things look a bit better. -->
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-    <h1>bc18-tinyviewer</h1>
-    <div>
-        <label for="fname">If you're hosting the website locally:</label>
-        <input id="fname" placeholder="filepath"/>
-    </div>
-    <div>
-        <label for="ffile">Upload a file:</label>
-        <input id="ffile" type="file"/>
-    </div>
-    <div id="loading"></div>
-    <div>
-        <label for="timeout">Set time delay per turn (ms):</label>
-        <input id="timeout" placeholder="timeout" min="1" type="number"/>
-    </div>
-    <div>
-        <label for="turnslider">Go to turn #:</label>
-        <input id="turnslider" type="range" min="1"/>
-        <button id="pause">Pause</button>
-        <button id="reset">Reset</button>
-    </div>
-    <h2 id="winner"></h2>
-    <div class="viewer">
+    <div id="column1">
+        <h1>bc18-tinyviewer</h1>
+        <div>
+            <input id="fname" style="display: none;" placeholder="Local filepath"/>
+        </div>
+        <div>
+            <input id="ffile" type="file"/>
+        </div>
         <div class="info">
-            <h3 style="text-align:center;">Turn: #<span id="turn"></span></h3>
-            <h3 style="text-align:center;">Location: <span id="location"></span></h3>
             <table>
                 <tr><td>Karbonite</td><td class="infoRed" id="red_karbonite"></td><td class="infoBlue" id="blue_karbonite"></td></tr>
                 <tr><td>Workers</td><td class="infoRed" id="infoRedWorker"></td><td class="infoBlue" id="infoBlueWorker"></td></tr>
@@ -42,14 +27,51 @@
             </table>
             <canvas id="research" width=300 height=600></canvas>
         </div>
-        <div class="maps">
-            <canvas id="earth" width=500 height=500 style="border: 1px solid #000"></canvas>
-            <canvas id="mars" width=500 height=500 style="border: 1px solid #000"></canvas>
+    </div>
+    <div id="column2">
+        <div class="controls">
+            <div id="loading"></div>
+            <div class="speed-controls">
+                <button style="background: #4575b4; border-bottom-left-radius: 4px; border-top-left-radius: 4px;" onclick="setTPSExternal(-1);">-1x</button>
+                <button style="background: #74add1;" onclick="setTPSExternal(-0.1);">-0.1x</button>
+                <button style="background: #f46d43;" onclick="setTPSExternal(0.1);">0.1x</button>
+                <button style="background: #ec6240;" onclick="setTPSExternal(1);">1x</button>
+                <button style="background: #e4583d;" onclick="setTPSExternal(2);">2x</button>
+                <button style="background: #d54138;" onclick="setTPSExternal(5);">5x</button>
+                <button style="background: #cc3735;" onclick="setTPSExternal(10);">10x</button>
+                <button style="background: #c42c32;" onclick="setTPSExternal(20);">20x</button>
+                <button style="background: #b4162c;" onclick="setTPSExternal(30);">30x</button>
+                <button style="background: #a90528;" onclick="setTPSExternal(100);">100x</button>
+                <input style="border-bottom-right-radius: 4px; border-top-right-radius: 4px;" id="timeout" placeholder="timeout" min="-100" step="0.1" type="number"/>
+            </div>
+            <div>
+                <input id="turnslider" type="range" min="1"/>
+            </div>
+            <div>
+                <h3 style="text-align:center;" id="turn">-</h3>
+            </div>
+            <div>
+                <button id="move_to_start"><img src="images/media_reset.svg" height="20px"></button>
+                <button id="move_prev"><img src="images/media_prev.svg" height="20px"></button>
+                <button id="pause" style="display: none;"><img src="images/media_pause.svg" height="20px"></button>
+                <button id="play"><img src="images/media_play.svg" height="20px"></button>
+                <button id="move_next"><img src="images/media_next.svg" height="20px"></button>
+                <button id="move_to_end"><img src="images/media_end.svg" height="20px"></button>
+            </div>
         </div>
-        <div class="graphs">
-            <canvas id="graphs" width=1006 height=250 style="border: 1px solid #000"></canvas>
+        
+
+        <div class="viewer">
+            <h2 id="winner"></h2>
+            <div class="maps">
+                <canvas id="earth" width=500 height=500 style="border: 1px solid #000"></canvas>
+                <canvas id="mars" width=500 height=500 style="border: 1px solid #000"></canvas>
+            </div>
+            <div class="graphs">
+                <canvas id="graphs" width=1006 height=250 style="border: 1px solid #000"></canvas>
+            </div>
+            <div style="color: #444; padding-top: 20px; display: inline-block;"><span>Icons from Noun Project by Mat Rutherford, To Uyen, Geovani Almeida, Maciej Świerczek, SBTS, Robert Bjurshagen and Xinh Studio.</span></div>
         </div>
-        <div style="color: #CCC; padding-top: 20px; display: inline-block;"><span>Icons from Noun Project by Mat Rutherford, To Uyen, Geovani Almeida, Maciej Świerczek, SBTS, Robert Bjurshagen and Xinh Studio.</span></div>
     </div>
 
   <script src="pako.js"></script>

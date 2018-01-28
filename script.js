@@ -149,9 +149,11 @@ function visualize(data) {
     // Whether we should restart the replay
     var reset = false;
 
-    // Store team names
+    // Store and display team names
     team_name['Red'] = data['metadata'].player1;
     team_name['Blue'] = data['metadata'].player2;
+    document.getElementById('red_name').innerText = team_name['Red'];
+    document.getElementById('blue_name').innerText = team_name['Blue'];
 
     // Determine who won
     winner = data['metadata'].winner;

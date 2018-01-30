@@ -72,10 +72,6 @@ function getTPS() {
     return 1000 / timeout;
 }
 
-if (location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "") {
-    document.getElementById("fname").style.display = "inline-block";
-}
-
 /*
 Visualize a replay file given a JSON object
 corresponding to the file.
@@ -153,9 +149,11 @@ function visualize(data) {
     // Whether we should restart the replay
     var reset = false;
 
-    // Store team names
+    // Store and display team names
     team_name['Red'] = data['metadata'].player1;
     team_name['Blue'] = data['metadata'].player2;
+    document.getElementById('red_name').innerText = team_name['Red'];
+    document.getElementById('blue_name').innerText = team_name['Blue'];
 
     // Determine who won
     winner = data['metadata'].winner;
@@ -1432,6 +1430,10 @@ function visualize(data) {
 document.getElementById('fname').addEventListener('keydown', function(e) {
     if (e.which === 13) {
         var path = this.value;
+        // Send amazon requests through a proxy because of CORS.
+        // Ideally we should get Teh Devs to set the proper CORS flags.
+        // For now here is a proxy server that can be used.
+        path = path.replace(/https?:\/\/s3\.amazonaws\.com/g, "https://pantherman594.com/proxy.php?csurl=https://s3.amazonaws.com");
 
         // Request the replay file
         var q = new XMLHttpRequest();
@@ -1442,13 +1444,22 @@ document.getElementById('fname').addEventListener('keydown', function(e) {
         q.onreadystatechange = function() {
             if (q.readyState == XMLHttpRequest.DONE) {
                 document.getElementById('loading').innerText = 'Done.';
+                var txt = q.response;
 
-                // Parse replay file
-                var data = JSON.parse(q.responseText);
-                visualize(data);
+                if (path.indexOf('.bc18z') !== -1) {
+                   handleGzippedReplay(txt);
+                }
+                else if (path.indexOf('.bc18') !== -1){
+                   handleUnzippedReplay(txt,false);
+                }
+                else {
+                   handleUnzippedReplay(txt,true);
+                }
             }
         };
 
+        q.open("GET", path, true);
+        q.responseType = "arraybuffer";
         q.send();
     }
 });
@@ -1456,122 +1467,80 @@ document.getElementById('fname').addEventListener('keydown', function(e) {
 // Selecting a file triggers replay visualization
 document.getElementById('ffile').addEventListener('change', function(e) {
     var file = this.files[0];
-
-    // Is the file gzipped?
-    if (file.name.indexOf('.bc18z') !== -1) {
-       handleGzippedReplay(file);
-    }
-    else if (file.name.indexOf('.bc18') !== -1){
-       handleUnzippedReplay(file,false);
-    }
-    else {
-       handleUnzippedReplay(file,true);
-    }
-});
-
-function handleGzippedReplay(file){
-    console.log('Handling gzipped replay');
     var reader = new FileReader();
-
-    // FileReader loads -- callback:
-    reader.onload = function(e) {
-        var array = new Uint8Array(reader.result);
-
-        try {
-            // Parse replay file
-            var data = JSON.parse(pako.inflate(array, {to: 'string'}));
-
-            visualize(data);
-        }
-        catch (err) {
-            alert('Could not decompress gzipped .bc18z file.');
-        }
-
-    }
-
-    reader.readAsArrayBuffer(file);
-}
-
-function handleUnzippedReplay(file,ambiguous_zipped_status){
-    console.log("Handling unzipped replay with ambiguous_zipped_status = "+ambiguous_zipped_status);
-
-    // Read the contents of the file
-    var reader = new FileReader();
-
+    
     // FileReader loads -- callback:
     reader.onload = function(e) {
         var txt = reader.result;
-        if (ambiguous_zipped_status){
-           //If we are unsure as to whether this file is zipped or not:
+        // Is the file gzipped?
 
-           try {
-               //Attempt to parse it as unzipped              
-               var data = JSON.parse(txt);
-
-               visualize(data);
-            }
-            catch(err) {
-                //If this fails, parse it as zipped
-
-                console.log("Ambiguous file fails to parse as straight json, passing to handleGzippedReplay");
-                handleGzippedReplay(file);
-            }
-
-        } else {
-
-            //We are certain this file is unzipped
-            var data = JSON.parse(txt);
-
-            visualize(data);
+        if (file.name.indexOf('.bc18z') !== -1) {
+           handleGzippedReplay(txt);
         }
-
-    }
-
-    reader.readAsText(file);
-}
-
-
-function getParameterByName(name, url) {
-    if (!url) url = window.location.href;
-    name = name.replace(/[\[\]]/g, "\\$&");
-    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
-        results = regex.exec(url);
-    if (!results) return null;
-    if (!results[2]) return '';
-    return decodeURIComponent(results[2].replace(/\+/g, " "));
-}
-
-let decodedURL = getParameterByName("replay");
-if (decodedURL != null && decodedURL.length > 0) {
-    // Send amazon requests through a proxy because of CORS.
-    // Ideally we should get Teh Devs to set the proper CORS flags.
-    // For now here is a proxy server that can be used.
-    decodedURL = decodedURL.replace("https://s3.amazonaws.com", "http://battlecode.arongranberg.com");
-    decodedURL = decodedURL.replace("http://s3.amazonaws.com", "http://battlecode.arongranberg.com");
-    var xhr = new XMLHttpRequest();
-    xhr.onload = function () {
-        var array = new Uint8Array(this.response);
-
-        try {
-            // Parse replay file
-            var data = JSON.parse(pako.inflate(array, {to: 'string'}));
-            visualize(data);
-        } catch (err) {
-            alert('Could not decompress gzipped .bc18z file.');
-            console.log(err);
+        else if (file.name.indexOf('.bc18') !== -1){
+           handleUnzippedReplay(txt,false);
+        }
+        else {
+           handleUnzippedReplay(txt,true);
         }
     }
-    xhr.open("GET", decodedURL, true);
-    xhr.responseType = "arraybuffer";
-    xhr.send();
+    
+    reader.readAsArrayBuffer(file)
+});
+
+function handleGzippedReplay(txt){
+    console.log('Handling gzipped replay');
+
+    var array = new Uint8Array(txt);
+
+    try {
+        // Parse replay file
+        var data = JSON.parse(pako.inflate(array, {to: 'string'}));
+
+        visualize(data);
+    }
+    catch (err) {
+        alert('Could not decompress gzipped .bc18z file.');
+        console.log(err);
+    }
+}
+
+function handleUnzippedReplay(txt,ambiguous_zipped_status){
+    console.log("Handling unzipped replay with ambiguous_zipped_status = "+ambiguous_zipped_status);
+    txt = new TextDecoder("utf-8").decode(txt); 
+
+    if (ambiguous_zipped_status){
+       //If we are unsure as to whether this file is zipped or not:
+
+       try {
+           //Attempt to parse it as unzipped              
+           var data = JSON.parse(txt);
+
+           visualize(data);
+        }
+        catch(err) {
+            //If this fails, parse it as zipped
+
+            console.log("Ambiguous file fails to parse as straight json, passing to handleGzippedReplay");
+            handleGzippedReplay(txt);
+        }
+
+    } else {
+
+        //We are certain this file is unzipped
+        var data = JSON.parse(txt);
+
+        visualize(data);
+    }
+
 }
 
 // Trigger if local path provided in url
-var regex = new RegExp("[?&]fname(=([^&#]*)|&|#|$)");
+var regex = new RegExp("[?&](fname|replay)(=([^&#]*)|&|#|$)");
 var results = regex.exec(window.location.href);
-if (results && results[2]) {
-    var txt = decodeURIComponent(results[2].replace(/\+/g, " "));
-    document.getElementById('fname').value = txt;
+if (results && results[3]) {
+    var url = decodeURIComponent(results[3].replace(/\+/g, " "));
+    document.getElementById('fname').value = url;
     var event;
     if (document.createEvent) {
         event = document.createEvent("HTMLEvents");
